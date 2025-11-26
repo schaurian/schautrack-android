@@ -36,7 +36,10 @@ build_debug_apk:
   script:
     - cd android
     - ./gradlew --no-daemon assembleDebug
+    - mkdir -p ../dist
+    - cp app/build/outputs/apk/debug/app-debug.apk ../dist/schautrack-debug.apk
   artifacts:
+    name: "schautrack-debug-apk"
     paths:
-      - android/app/build/outputs/apk/debug/app-debug.apk
+      - dist/schautrack-debug.apk
     expire_in: 1 week
