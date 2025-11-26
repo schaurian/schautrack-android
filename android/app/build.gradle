@@ -3,6 +3,24 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+// Derive a version name from the commit hash (prefers CI-provided SHA, falls back to local git)
+def commitHash = {
+    def envSha = System.getenv("CI_COMMIT_SHORT_SHA") ?: System.getenv("CI_COMMIT_SHA")
+    if (envSha) {
+        return envSha.take(7)
+    }
+    try {
+        def proc = ["git", "-C", rootDir.absolutePath, "rev-parse", "--short", "HEAD"].execute()
+        proc.waitFor()
+        if (proc.exitValue() == 0) {
+            return proc.text.trim()
+        }
+    } catch (ignored) {
+        // ignore and fall through
+    }
+    return "dev"
+}
+
 android {
     namespace = "to.schauer.schautrack"
     compileSdk = 34
@@ -12,7 +30,7 @@ android {
         minSdk = 24
         targetSdk = 34
         versionCode = 1
-        versionName = "1.0.0"
+        versionName = commitHash()
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
