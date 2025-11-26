@@ -53,6 +53,31 @@ pages:
   script:
     - mkdir -p public
     - cp dist/schautrack-debug.apk public/
+    - |
+      cat > public/index.html <<'HTML'
+      <!doctype html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Schautrack APK</title>
+        <style>
+          body { font-family: system-ui, -apple-system, Segoe UI, sans-serif; margin: 2rem; color: #111; }
+          .card { max-width: 480px; padding: 1.5rem; border: 1px solid #ddd; border-radius: 12px; box-shadow: 0 6px 22px rgba(0,0,0,0.06); }
+          .btn { display: inline-block; margin-top: 1rem; padding: 0.75rem 1.25rem; background: #4F46E5; color: #fff; text-decoration: none; border-radius: 8px; font-weight: 600; }
+          .meta { margin-top: 0.75rem; color: #555; font-size: 0.9rem; }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          <h1>Schautrack APK</h1>
+          <p>Download the latest debug build.</p>
+          <a class="btn" href="./schautrack-debug.apk" download>Download APK</a>
+          <div class="meta">File: schautrack-debug.apk</div>
+        </div>
+      </body>
+      </html>
+      HTML
   artifacts:
     paths:
       - public
