@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.os.Bundle
 import android.view.KeyEvent
 import android.webkit.WebChromeClient
+import android.webkit.CookieManager
 import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
@@ -28,6 +29,12 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         val webView = binding.webView
+
+        // Ensure session cookies persist across app restarts.
+        CookieManager.getInstance().apply {
+            setAcceptCookie(true)
+            setAcceptThirdPartyCookies(webView, true)
+        }
         webView.settings.apply {
             javaScriptEnabled = true
             domStorageEnabled = true

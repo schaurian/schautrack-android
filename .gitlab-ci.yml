@@ -5,14 +5,15 @@ variables:
   ANDROID_HOME: "$ANDROID_SDK_ROOT"
   GRADLE_USER_HOME: "$CI_PROJECT_DIR/.gradle"
 
+stages:
+  - build
+  - deploy
+
 cache:
   key: "$CI_COMMIT_REF_SLUG"
   paths:
     - .gradle/wrapper
     - .gradle/caches
-
-stages:
-  - build
 
 before_script:
   - apt-get update -qq
@@ -43,3 +44,17 @@ build_debug_apk:
     paths:
       - dist/schautrack-debug.apk
     expire_in: 1 week
+
+pages:
+  stage: deploy
+  needs:
+    - job: build_debug_apk
+      artifacts: true
+  script:
+    - mkdir -p public
+    - cp dist/schautrack-debug.apk public/
+  artifacts:
+    paths:
+      - public
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
