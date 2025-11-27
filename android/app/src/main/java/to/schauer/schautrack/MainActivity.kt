@@ -71,4 +71,10 @@ class MainActivity : AppCompatActivity() {
         super.onSaveInstanceState(outState)
         binding.webView.saveState(outState)
     }
+
+    override fun onResume() {
+        super.onResume()
+        // Refresh the current page when the app is reopened to ensure session and content are up to date.
+        binding.webView.reload()
+    }
 }
