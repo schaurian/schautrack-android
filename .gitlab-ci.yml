@@ -8,6 +8,7 @@ variables:
 stages:
   - build
   - deploy
+  - k8s-deploy
 
 cache:
   key: "$CI_COMMIT_REF_SLUG"
@@ -83,3 +84,25 @@ pages:
       - public
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
+
+deploy_k8s:
+  stage: k8s-deploy
+  image:
+    name: bitnami/kubectl:1.30
+    entrypoint: [""]
+  needs:
+    - job: build_debug_apk
+      artifacts: true
+  variables:
+    K8S_MANIFESTS_DIR: "k8s"
+  script:
+    - 'test -n "${KUBECONFIG_DATA:-}" || (echo "KUBECONFIG_DATA missing" && exit 1)'
+    - mkdir -p ~/.kube
+    - echo "$KUBECONFIG_DATA" | base64 -d > ~/.kube/config
+    - kubectl config set-context --current --namespace="${KUBE_NAMESPACE:-default}" || true
+    - kubectl version --short
+    - 'test -d "$K8S_MANIFESTS_DIR" || (echo "Manifests dir $K8S_MANIFESTS_DIR not found" && exit 1)'
+    - kubectl apply -f "$K8S_MANIFESTS_DIR"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $KUBECONFIG_DATA'
+      when: on_success
