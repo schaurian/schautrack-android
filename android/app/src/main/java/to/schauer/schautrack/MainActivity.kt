@@ -9,6 +9,7 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.content.Context
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.webkit.WebSettingsCompat
@@ -16,10 +17,14 @@ import androidx.webkit.WebViewFeature
 import to.schauer.schautrack.databinding.ActivityMainBinding
 
 private const val START_URL = "https://schautrack.schauer.to/"
+private const val PREFS_NAME = "schautrack_prefs"
+private const val KEY_LAST_SEEN = "last_seen_at"
+private const val REFRESH_THRESHOLD_MS = 15 * 60 * 1000L
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
+    private val prefs by lazy { getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE) }
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -74,7 +79,17 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        // Refresh the current page when the app is reopened to ensure session and content are up to date.
-        binding.webView.reload()
+        val lastSeen = prefs.getLong(KEY_LAST_SEEN, 0L)
+        val now = System.currentTimeMillis()
+        if (lastSeen > 0 && now - lastSeen >= REFRESH_THRESHOLD_MS) {
+            binding.webView.reload()
+        }
+        // Update the last seen timestamp on each resume.
+        prefs.edit().putLong(KEY_LAST_SEEN, now).apply()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        prefs.edit().putLong(KEY_LAST_SEEN, System.currentTimeMillis()).apply()
     }
 }
