@@ -12,6 +12,7 @@ import android.webkit.WebViewClient
 import android.content.Context
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.isVisible
 import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebViewFeature
 import to.schauer.schautrack.databinding.ActivityMainBinding
@@ -56,8 +57,24 @@ class MainActivity : AppCompatActivity() {
             override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                 return false
             }
+            override fun onPageFinished(view: WebView?, url: String?) {
+                binding.swipeRefresh.isRefreshing = false
+            }
         }
         webView.webChromeClient = WebChromeClient()
+
+        binding.swipeRefresh.setOnRefreshListener {
+            if (!webView.canGoBackOrForward(0)) {
+                binding.swipeRefresh.isRefreshing = false
+                return@setOnRefreshListener
+            }
+            webView.reload()
+        }
+
+        webView.setOnScrollChangeListener { _, _, scrollY, _, _ ->
+            // Enable pull-to-refresh only when at top of page
+            binding.swipeRefresh.isEnabled = scrollY == 0
+        }
 
         if (savedInstanceState == null) {
             webView.loadUrl(START_URL)
