@@ -4,7 +4,7 @@ stages:
   - production_release
 
 variables:
-  ANDROID_SDK_ROOT: "/sdk"
+  ANDROID_SDK_ROOT: "/opt/android-sdk-linux"
   GRADLE_USER_HOME: "${CI_PROJECT_DIR}/.gradle"
   PLAY_STAGED_PERCENT: "0.2"
   GIT_DEPTH: "0"
@@ -17,7 +17,7 @@ cache:
     - android/app/build
 
 .publish_template: &publish_template
-  image: registry.gitlab.com/gitlab-org/ci-cd/android-sdk:api-34
+  image: ghcr.io/cirruslabs/android-sdk:34
   before_script:
     - |
       if [ -n "$ANDROID_UPLOAD_KEYSTORE_B64" ] && [ -z "$ANDROID_UPLOAD_KEYSTORE" ]; then
