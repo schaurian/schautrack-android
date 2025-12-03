@@ -83,7 +83,7 @@ beta_release:
     - job: semver-tag
       artifacts: true
   script:
-    - VERSION=$(cat version.txt)
+    - VERSION=$(cat ../version.txt)
     - export VERSION_NAME="${VERSION#v}"
     - ./gradlew --no-daemon publishBetaReleaseBundle
   rules:
@@ -101,7 +101,7 @@ production_release:
   when: manual
   allow_failure: false
   script:
-    - VERSION=$(cat version.txt)
+    - VERSION=$(cat ../version.txt)
     - export VERSION_NAME="${VERSION#v}"
     - export PLAY_RELEASE_STATUS="inprogress"
     - ./gradlew --no-daemon publishProdReleaseBundle
