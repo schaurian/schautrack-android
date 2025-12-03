@@ -99,32 +99,20 @@ play {
         serviceAccountCredentials.set(file(System.getenv("PLAY_SERVICE_ACCOUNT_JSON")))
     }
     defaultToAppBundles.set(true)
-    resolutionStrategy.set(com.github.triplet.gradle.androidpublisher.ResolutionStrategy.AUTO)
+    track.set(System.getenv("PLAY_TRACK") ?: "beta")
 
-    playConfigs {
-        register("beta") {
-            track.set("beta")
-            releaseStatus.set(com.github.triplet.gradle.androidpublisher.ReleaseStatus.COMPLETED)
-        }
-        register("prod") {
-            track.set("production")
-
-            def statusEnv = System.getenv("PLAY_RELEASE_STATUS")?.toLowerCase()
-            if (statusEnv) {
-                def status = statusEnv == "completed"
-                        ? com.github.triplet.gradle.androidpublisher.ReleaseStatus.COMPLETED
-                        : com.github.triplet.gradle.androidpublisher.ReleaseStatus.IN_PROGRESS
-                releaseStatus.set(status)
-            } else {
-                releaseStatus.set(com.github.triplet.gradle.androidpublisher.ReleaseStatus.IN_PROGRESS)
-            }
-
-            def fractionEnv = System.getenv("PLAY_USER_FRACTION")
-            if (fractionEnv) {
-                userFraction.set(new BigDecimal(fractionEnv))
-            }
-        }
+    def statusEnv = System.getenv("PLAY_RELEASE_STATUS")?.toLowerCase()
+    if (statusEnv) {
+        def status = statusEnv == "completed"
+                ? com.github.triplet.gradle.androidpublisher.ReleaseStatus.COMPLETED
+                : com.github.triplet.gradle.androidpublisher.ReleaseStatus.IN_PROGRESS
+        releaseStatus.set(status)
     }
+    def fractionEnv = System.getenv("PLAY_USER_FRACTION")
+    if (fractionEnv) {
+        userFraction.set(new BigDecimal(fractionEnv))
+    }
+    resolutionStrategy.set(com.github.triplet.gradle.androidpublisher.ResolutionStrategy.AUTO)
 }
 
 dependencies {
