@@ -112,7 +112,8 @@ play {
     if (fractionEnv) {
         userFraction.set(new BigDecimal(fractionEnv))
     }
-    resolutionStrategy.set(com.github.triplet.gradle.androidpublisher.ResolutionStrategy.AUTO)
+    // Skip fetching existing version codes from Play; we rely on CI-provided versionCode uniqueness.
+    resolutionStrategy.set(com.github.triplet.gradle.androidpublisher.ResolutionStrategy.IGNORE)
 }
 
 dependencies {
