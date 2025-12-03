@@ -1,25 +1,24 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    id("com.github.triplet.play")
 }
 
-// Derive a version name from the commit hash (prefers CI-provided SHA, falls back to local git)
-def commitHash = {
-    def envSha = System.getenv("CI_COMMIT_SHORT_SHA") ?: System.getenv("CI_COMMIT_SHA")
-    if (envSha) {
-        return envSha.take(7)
-    }
+// Semantic versioning driven by CI tags or manual overrides
+def resolvedVersionName = {
+    def tagVersion = System.getenv("CI_COMMIT_TAG")?.replaceFirst(/^v/, "")
+    return System.getenv("VERSION_NAME") ?: tagVersion ?: "1.0.0"
+}.call()
+
+// Ensure versionCode monotonically increases; defaults to pipeline IID if provided
+def resolvedVersionCode = {
+    def code = System.getenv("VERSION_CODE") ?: System.getenv("CI_PIPELINE_IID")
     try {
-        def proc = ["git", "-C", rootDir.absolutePath, "rev-parse", "--short", "HEAD"].execute()
-        proc.waitFor()
-        if (proc.exitValue() == 0) {
-            return proc.text.trim()
-        }
+        return code?.toInteger() ?: 1
     } catch (ignored) {
-        // ignore and fall through
+        return 1
     }
-    return "dev"
-}
+}.call()
 
 android {
     namespace = "to.schauer.schautrack"
@@ -29,10 +28,23 @@ android {
         applicationId = "to.schauer.schautrack"
         minSdk = 24
         targetSdk = 34
-        versionCode = 1
-        versionName = commitHash()
+        versionCode = resolvedVersionCode
+        versionName = resolvedVersionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    signingConfigs {
+        release {
+            if (System.getenv("ANDROID_UPLOAD_KEYSTORE")) {
+                storeFile = file(System.getenv("ANDROID_UPLOAD_KEYSTORE"))
+                storePassword = System.getenv("ANDROID_UPLOAD_KEYSTORE_PASS") ?: ""
+                keyAlias = System.getenv("ANDROID_UPLOAD_KEY_ALIAS") ?: ""
+                keyPassword = System.getenv("ANDROID_UPLOAD_KEY_PASS") ?: ""
+            } else {
+                initWith(signingConfigs.debug)
+            }
+        }
     }
 
     buildTypes {
@@ -42,6 +54,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = signingConfigs.release
         }
         debug {
             minifyEnabled = false
@@ -58,6 +71,27 @@ android {
     buildFeatures {
         viewBinding = true
     }
+}
+
+play {
+    if (System.getenv("PLAY_SERVICE_ACCOUNT_JSON")) {
+        serviceAccountCredentials.set(file(System.getenv("PLAY_SERVICE_ACCOUNT_JSON")))
+    }
+    defaultToAppBundles.set(true)
+    track.set(System.getenv("PLAY_TRACK") ?: "internal")
+
+    def statusEnv = System.getenv("PLAY_RELEASE_STATUS")?.toLowerCase()
+    if (statusEnv) {
+        def status = statusEnv == "completed"
+                ? com.github.triplet.gradle.androidpublisher.ReleaseStatus.COMPLETED
+                : com.github.triplet.gradle.androidpublisher.ReleaseStatus.IN_PROGRESS
+        releaseStatus.set(status)
+    }
+    def fractionEnv = System.getenv("PLAY_USER_FRACTION")
+    if (fractionEnv) {
+        userFraction.set(new BigDecimal(fractionEnv))
+    }
+    resolutionStrategy.set(com.github.triplet.gradle.androidpublisher.ResolutionStrategy.AUTO)
 }
 
 dependencies {

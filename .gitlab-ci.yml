@@ -1,85 +1,106 @@
-image: eclipse-temurin:17-jdk
+stages:
+  - release
+  - staged_release
+  - production_release
 
 variables:
-  ANDROID_SDK_ROOT: "$CI_PROJECT_DIR/.android-sdk"
-  ANDROID_HOME: "$ANDROID_SDK_ROOT"
-  GRADLE_USER_HOME: "$CI_PROJECT_DIR/.gradle"
-
-stages:
-  - build
-  - deploy
+  ANDROID_SDK_ROOT: "/sdk"
+  GRADLE_USER_HOME: "${CI_PROJECT_DIR}/.gradle"
+  PLAY_TRACK_TEST: "internal"
+  PLAY_TRACK_PROD: "production"
+  PLAY_STAGED_PERCENT: "0.2"
+  GIT_DEPTH: "0"
 
 cache:
-  key: "$CI_COMMIT_REF_SLUG"
+  key: ${CI_PROJECT_NAME}
   paths:
     - .gradle/wrapper
     - .gradle/caches
+    - android/app/build
 
-before_script:
-  - apt-get update -qq
-  - apt-get install -yq wget unzip
-  - mkdir -p "$ANDROID_SDK_ROOT"
-  - wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O /tmp/cmdline-tools.zip
-  - unzip -q /tmp/cmdline-tools.zip -d "$ANDROID_SDK_ROOT"
-  - mv "$ANDROID_SDK_ROOT/cmdline-tools" "$ANDROID_SDK_ROOT/cmdline-tools-temp"
-  - mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools/latest"
-  - mv "$ANDROID_SDK_ROOT/cmdline-tools-temp"/* "$ANDROID_SDK_ROOT/cmdline-tools/latest/"
-  - |
-    set +o pipefail
-    yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$ANDROID_SDK_ROOT" "platforms;android-34" "platform-tools" "build-tools;34.0.0"
-  - |
-    set +o pipefail
-    yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --licenses --sdk_root="$ANDROID_SDK_ROOT"
-  - export PATH="$ANDROID_SDK_ROOT/platform-tools:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH"
-
-build_debug_apk:
-  stage: build
-  script:
-    - cd android
-    - ./gradlew --no-daemon assembleDebug
-    - mkdir -p ../dist
-    - cp app/build/outputs/apk/debug/app-debug.apk ../dist/schautrack-debug.apk
-  artifacts:
-    name: "schautrack-debug-apk"
-    paths:
-      - dist/schautrack-debug.apk
-    expire_in: 1 week
-
-pages:
-  stage: deploy
-  needs:
-    - job: build_debug_apk
-      artifacts: true
-  script:
-    - mkdir -p public
-    - cp dist/schautrack-debug.apk public/
+.publish_template: &publish_template
+  image: registry.gitlab.com/gitlab-org/ci-cd/android-sdk:api-34
+  before_script:
     - |
-      cat > public/index.html <<'HTML'
-      <!doctype html>
-      <html lang="en">
-      <head>
-        <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>Schautrack APK</title>
-        <style>
-          body { font-family: system-ui, -apple-system, Segoe UI, sans-serif; margin: 2rem; color: #111; }
-          .card { max-width: 480px; padding: 1.5rem; border: 1px solid #ddd; border-radius: 12px; box-shadow: 0 6px 22px rgba(0,0,0,0.06); }
-          .btn { display: inline-block; margin-top: 1rem; padding: 0.75rem 1.25rem; background: #4F46E5; color: #fff; text-decoration: none; border-radius: 8px; font-weight: 600; }
-          .meta { margin-top: 0.75rem; color: #555; font-size: 0.9rem; }
-        </style>
-      </head>
-      <body>
-        <div class="card">
-          <h1>Schautrack APK</h1>
-          <p>Download the latest debug build.</p>
-          <a class="btn" href="./schautrack-debug.apk" download>Download APK</a>
-          <div class="meta">File: schautrack-debug.apk</div>
-        </div>
-      </body>
-      </html>
-      HTML
+      if [ -n "$ANDROID_UPLOAD_KEYSTORE_B64" ] && [ -z "$ANDROID_UPLOAD_KEYSTORE" ]; then
+        mkdir -p android
+        echo "$ANDROID_UPLOAD_KEYSTORE_B64" | base64 -d > android/upload-keystore.jks
+        export ANDROID_UPLOAD_KEYSTORE="$PWD/android/upload-keystore.jks"
+      fi
+    - cd android
+    - chmod +x gradlew
   artifacts:
     paths:
-      - public
+      - android/app/build/outputs/
+
+semver-tag:
+  stage: release
+  image: alpine:3.19
+  before_script:
+    - apk add --no-cache git curl bash
+  script:
+    - chmod +x scripts/bump-version.sh scripts/generate-changelog.sh
+    - VERSION=$(scripts/bump-version.sh)
+    - echo "$VERSION" > version.txt
+    - scripts/generate-changelog.sh "$VERSION" > changelog.md
+    - |
+      git config --global user.email "${GITLAB_USER_EMAIL:-ci@example.com}"
+      git config --global user.name "${GITLAB_USER_NAME:-GitLab CI}"
+    - git tag -a "$VERSION" -m "Release $VERSION"
+    - |
+      PUSH_USER="${GIT_PUSH_USER:-gitlab-ci-token}"
+      PUSH_TOKEN="${GIT_PUSH_TOKEN:-$CI_JOB_TOKEN}"
+      git push "https://${PUSH_USER}:${PUSH_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git" "$VERSION"
+    - |
+      if [ -n "${GL_RELEASE_TOKEN:-}" ]; then
+        curl --header "PRIVATE-TOKEN: ${GL_RELEASE_TOKEN}" \
+          --data-urlencode "name=$VERSION" \
+          --data-urlencode "tag_name=$VERSION" \
+          --data-urlencode "description=$(cat changelog.md)" \
+          --request POST "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/releases"
+      fi
+  artifacts:
+    paths:
+      - version.txt
+      - changelog.md
+    expire_in: 1 week
   rules:
-    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      when: on_success
+
+staged_release:
+  stage: staged_release
+  <<: *publish_template
+  needs:
+    - job: semver-tag
+      artifacts: true
+  variables:
+    PLAY_TRACK: $PLAY_TRACK_TEST
+    PLAY_RELEASE_STATUS: "completed"
+  script:
+    - VERSION=$(cat version.txt)
+    - export VERSION_NAME="${VERSION#v}"
+    - ./gradlew --no-daemon publishReleaseBundle
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      when: on_success
+
+production_release:
+  stage: production_release
+  <<: *publish_template
+  needs:
+    - job: semver-tag
+      artifacts: true
+  variables:
+    PLAY_TRACK: $PLAY_TRACK_PROD
+    PLAY_RELEASE_STATUS: "inprogress"
+    PLAY_USER_FRACTION: $PLAY_STAGED_PERCENT
+  when: manual
+  allow_failure: false
+  script:
+    - VERSION=$(cat version.txt)
+    - export VERSION_NAME="${VERSION#v}"
+    - ./gradlew --no-daemon publishReleaseBundle
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      when: manual
