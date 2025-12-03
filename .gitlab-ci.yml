@@ -25,6 +25,10 @@ cache:
         echo "$ANDROID_UPLOAD_KEYSTORE_B64" | base64 -d > android/upload-keystore.jks
         export ANDROID_UPLOAD_KEYSTORE="$PWD/android/upload-keystore.jks"
       fi
+      if [ -n "$PLAY_SERVICE_ACCOUNT_JSON_B64" ] && [ -z "$PLAY_SERVICE_ACCOUNT_JSON" ]; then
+        echo "$PLAY_SERVICE_ACCOUNT_JSON_B64" | base64 -d > service-account.json
+        export PLAY_SERVICE_ACCOUNT_JSON="$PWD/service-account.json"
+      fi
     - cd android
     - chmod +x gradlew
   artifacts:
