@@ -1,13 +1,11 @@
 stages:
   - release
-  - staged_release
+  - beta_release
   - production_release
 
 variables:
   ANDROID_SDK_ROOT: "/sdk"
   GRADLE_USER_HOME: "${CI_PROJECT_DIR}/.gradle"
-  PLAY_TRACK_TEST: "internal"
-  PLAY_TRACK_PROD: "production"
   PLAY_STAGED_PERCENT: "0.2"
   GIT_DEPTH: "0"
 
@@ -50,14 +48,20 @@ semver-tag:
     - |
       PUSH_USER="${GIT_PUSH_USER:-gitlab-ci-token}"
       PUSH_TOKEN="${GIT_PUSH_TOKEN:-$CI_JOB_TOKEN}"
-      git push "https://${PUSH_USER}:${PUSH_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git" "$VERSION"
+      if git push "https://${PUSH_USER}:${PUSH_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git" "$VERSION"; then
+        echo "Tag push succeeded: $VERSION"
+      else
+        echo "WARN: Tag push failed. Set GIT_PUSH_TOKEN with tag permissions. Falling back to pipeline version."
+        VERSION="v0.0.${CI_PIPELINE_IID:-1}"
+        echo "$VERSION" > version.txt
+      fi
     - |
       if [ -n "${GL_RELEASE_TOKEN:-}" ]; then
         curl --header "PRIVATE-TOKEN: ${GL_RELEASE_TOKEN}" \
           --data-urlencode "name=$VERSION" \
           --data-urlencode "tag_name=$VERSION" \
           --data-urlencode "description=$(cat changelog.md)" \
-          --request POST "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/releases"
+          --request POST "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/releases" || echo "WARN: GitLab release creation failed."
       fi
   artifacts:
     paths:
@@ -68,19 +72,16 @@ semver-tag:
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
       when: on_success
 
-staged_release:
-  stage: staged_release
+beta_release:
+  stage: beta_release
   <<: *publish_template
   needs:
     - job: semver-tag
       artifacts: true
-  variables:
-    PLAY_TRACK: $PLAY_TRACK_TEST
-    PLAY_RELEASE_STATUS: "completed"
   script:
     - VERSION=$(cat version.txt)
     - export VERSION_NAME="${VERSION#v}"
-    - ./gradlew --no-daemon publishReleaseBundle
+    - ./gradlew --no-daemon publishBetaReleaseBundle
   rules:
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
       when: on_success
@@ -92,15 +93,14 @@ production_release:
     - job: semver-tag
       artifacts: true
   variables:
-    PLAY_TRACK: $PLAY_TRACK_PROD
-    PLAY_RELEASE_STATUS: "inprogress"
     PLAY_USER_FRACTION: $PLAY_STAGED_PERCENT
   when: manual
   allow_failure: false
   script:
     - VERSION=$(cat version.txt)
     - export VERSION_NAME="${VERSION#v}"
-    - ./gradlew --no-daemon publishReleaseBundle
+    - export PLAY_RELEASE_STATUS="inprogress"
+    - ./gradlew --no-daemon publishProdReleaseBundle
   rules:
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
       when: manual

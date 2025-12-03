@@ -25,13 +25,26 @@ android {
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "to.schauer.schautrack"
         minSdk = 24
         targetSdk = 34
         versionCode = resolvedVersionCode
         versionName = resolvedVersionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    flavorDimensions += "env"
+
+    productFlavors {
+        create("beta") {
+            dimension = "env"
+            applicationId = "to.schauer.schautrackbeta"
+            versionNameSuffix = "-beta"
+        }
+        create("prod") {
+            dimension = "env"
+            applicationId = "to.schauer.schautrack"
+        }
     }
 
     signingConfigs {
@@ -71,6 +84,14 @@ android {
     buildFeatures {
         viewBinding = true
     }
+
+    // Ensure variant-aware Play config works with flavors
+    applicationVariants.configureEach { variant ->
+        variant.outputs.configureEach { output ->
+            output.versionNameOverride = variant.versionName
+            output.versionCodeOverride = variant.versionCode
+        }
+    }
 }
 
 play {
@@ -78,20 +99,32 @@ play {
         serviceAccountCredentials.set(file(System.getenv("PLAY_SERVICE_ACCOUNT_JSON")))
     }
     defaultToAppBundles.set(true)
-    track.set(System.getenv("PLAY_TRACK") ?: "internal")
-
-    def statusEnv = System.getenv("PLAY_RELEASE_STATUS")?.toLowerCase()
-    if (statusEnv) {
-        def status = statusEnv == "completed"
-                ? com.github.triplet.gradle.androidpublisher.ReleaseStatus.COMPLETED
-                : com.github.triplet.gradle.androidpublisher.ReleaseStatus.IN_PROGRESS
-        releaseStatus.set(status)
-    }
-    def fractionEnv = System.getenv("PLAY_USER_FRACTION")
-    if (fractionEnv) {
-        userFraction.set(new BigDecimal(fractionEnv))
-    }
     resolutionStrategy.set(com.github.triplet.gradle.androidpublisher.ResolutionStrategy.AUTO)
+
+    playConfigs {
+        register("beta") {
+            track.set("beta")
+            releaseStatus.set(com.github.triplet.gradle.androidpublisher.ReleaseStatus.COMPLETED)
+        }
+        register("prod") {
+            track.set("production")
+
+            def statusEnv = System.getenv("PLAY_RELEASE_STATUS")?.toLowerCase()
+            if (statusEnv) {
+                def status = statusEnv == "completed"
+                        ? com.github.triplet.gradle.androidpublisher.ReleaseStatus.COMPLETED
+                        : com.github.triplet.gradle.androidpublisher.ReleaseStatus.IN_PROGRESS
+                releaseStatus.set(status)
+            } else {
+                releaseStatus.set(com.github.triplet.gradle.androidpublisher.ReleaseStatus.IN_PROGRESS)
+            }
+
+            def fractionEnv = System.getenv("PLAY_USER_FRACTION")
+            if (fractionEnv) {
+                userFraction.set(new BigDecimal(fractionEnv))
+            }
+        }
+    }
 }
 
 dependencies {
