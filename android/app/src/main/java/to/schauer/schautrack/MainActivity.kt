@@ -49,8 +49,8 @@ class MainActivity : AppCompatActivity() {
             userAgentString = "$userAgentString SchautrackApp"
         }
 
-        if (WebViewFeature.isFeatureSupported(WebViewFeature.FORCE_DARK)) {
-            WebSettingsCompat.setForceDark(webView.settings, WebSettingsCompat.FORCE_DARK_OFF)
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.ALGORITHMIC_DARKENING)) {
+            WebSettingsCompat.setAlgorithmicDarkeningAllowed(webView.settings, false)
         }
 
         webView.webViewClient = object : WebViewClient() {
