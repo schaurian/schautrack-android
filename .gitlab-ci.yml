@@ -1,4 +1,5 @@
 stages:
+  - build
   - release
   - beta_release
   - production_release
@@ -16,8 +17,23 @@ cache:
     - .gradle/caches
     - android/app/build
 
-.publish_template: &publish_template
+.build_template: &build_template
   image: ghcr.io/cirruslabs/android-sdk:34
+  before_script:
+    - |
+      if [ -n "$ANDROID_UPLOAD_KEYSTORE_B64" ] && [ -z "$ANDROID_UPLOAD_KEYSTORE" ]; then
+        mkdir -p android
+        echo "$ANDROID_UPLOAD_KEYSTORE_B64" | base64 -d > android/upload-keystore.jks
+        export ANDROID_UPLOAD_KEYSTORE="$PWD/android/upload-keystore.jks"
+      fi
+    - cd android
+    - chmod +x gradlew
+  artifacts:
+    paths:
+      - android/app/build/outputs/
+
+.publish_template: &publish_template
+  <<: *build_template
   before_script:
     - |
       if [ -n "$ANDROID_UPLOAD_KEYSTORE_B64" ] && [ -z "$ANDROID_UPLOAD_KEYSTORE" ]; then
@@ -31,9 +47,18 @@ cache:
       fi
     - cd android
     - chmod +x gradlew
+
+build_aab:
+  stage: build
+  <<: *build_template
+  script:
+    - ./gradlew --no-daemon bundleProdRelease
   artifacts:
     paths:
-      - android/app/build/outputs/
+      - android/app/build/outputs/bundle/prodRelease/
+    expire_in: 1 week
+  rules:
+    - when: always
 
 semver-tag:
   stage: release
