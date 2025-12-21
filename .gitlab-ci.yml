@@ -1,6 +1,7 @@
 stages:
   - build
   - release
+  - internal_release
   - beta_release
   - production_release
 
@@ -101,22 +102,42 @@ semver-tag:
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
       when: on_success
 
-beta_release:
-  stage: beta_release
+internal_release:
+  stage: internal_release
   <<: *publish_template
   needs:
     - job: semver-tag
       artifacts: true
   variables:
-    PLAY_TRACK: "beta"
+    PLAY_TRACK: "internal"
     PLAY_RELEASE_STATUS: "completed"
   script:
     - VERSION=$(cat ../version.txt)
     - export VERSION_NAME="${VERSION#v}"
-    - ./gradlew --no-daemon publishBetaReleaseBundle
+    - ./gradlew --no-daemon publishProdReleaseBundle
   rules:
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
       when: on_success
+
+beta_release:
+  stage: beta_release
+  <<: *publish_template
+  needs:
+    - job: internal_release
+      artifacts: false
+    - job: semver-tag
+      artifacts: true
+  variables:
+    PLAY_TRACK: "beta"
+    PLAY_RELEASE_STATUS: "completed"
+  when: manual
+  script:
+    - VERSION=$(cat ../version.txt)
+    - export VERSION_NAME="${VERSION#v}"
+    - ./gradlew --no-daemon publishProdReleaseBundle
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      when: manual
 
 production_release:
   stage: production_release
