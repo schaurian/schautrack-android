@@ -19,7 +19,7 @@ cache:
     - android/app/build
 
 .build_template: &build_template
-  image: ghcr.io/cirruslabs/android-sdk:35
+  image: ghcr.io/cirruslabs/android-sdk:36
   before_script:
     - |
       if [ -n "$ANDROID_UPLOAD_KEYSTORE_B64" ] && [ -z "$ANDROID_UPLOAD_KEYSTORE" ]; then

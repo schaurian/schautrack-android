@@ -15,11 +15,24 @@
 
     </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/changeServerButton"
+        style="@style/Widget.Material3.Button.TonalButton"
+        android:layout_width="wrap_content"
+        android:layout_height="72dp"
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginBottom="120dp"
+        android:backgroundTint="@color/card"
+        android:textColor="@color/text"
+        android:textSize="18sp"
+        android:text="@string/change_server"
+        android:visibility="gone" />
+
     <LinearLayout
         android:id="@+id/loadingView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="?android:attr/colorBackground"
+        android:background="@color/bg_1"
         android:gravity="center"
         android:orientation="vertical"
         android:visibility="visible">
@@ -35,7 +48,8 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
             android:text="@string/loading"
-            android:textAppearance="?android:attr/textAppearanceMedium" />
+            android:textColor="@color/muted"
+            android:textAppearance="?attr/textAppearanceBodyLarge" />
 
     </LinearLayout>
 
@@ -43,7 +57,7 @@
         android:id="@+id/errorView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="?android:attr/colorBackground"
+        android:background="@color/bg_1"
         android:gravity="center"
         android:orientation="vertical"
         android:visibility="gone">
@@ -52,21 +66,33 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/no_connection"
-            android:textAppearance="?android:attr/textAppearanceLarge" />
+            android:textColor="@color/text"
+            android:textAppearance="?attr/textAppearanceHeadlineMedium" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
             android:text="@string/check_internet"
-            android:textAppearance="?android:attr/textAppearanceSmall" />
+            android:textColor="@color/muted"
+            android:textAppearance="?attr/textAppearanceBodyMedium" />
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/retryButton"
+            style="@style/Widget.Material3.Button.TonalButton"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_height="56dp"
             android:layout_marginTop="24dp"
             android:text="@string/retry" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/errorChangeServerButton"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:layout_marginTop="16dp"
+            android:textColor="@color/text"
+            android:text="@string/change_server" />
 
     </LinearLayout>
 

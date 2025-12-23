@@ -1,16 +1,48 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <style name="Theme.Schautrack" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+    <!-- Night theme inherits from main theme (already dark) -->
+    <style name="Theme.Schautrack" parent="Theme.Material3.Dark.NoActionBar">
+        <!-- Window -->
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:windowLightStatusBar">false</item>
-        <item name="android:navigationBarColor">@android:color/black</item>
-        <item name="colorPrimary">@color/purple_500</item>
-        <item name="colorPrimaryVariant">@color/purple_700</item>
-        <item name="colorAccent">@color/teal_200</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowDrawsSystemBarBackgrounds">true</item>
         <item name="android:windowTranslucentStatus">false</item>
         <item name="android:windowTranslucentNavigation">false</item>
         <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
         <item name="android:windowDisablePreview">true</item>
         <item name="android:enforceNavigationBarContrast" tools:targetApi="29">false</item>
+
+        <!-- Schautrack Colors -->
+        <item name="android:colorBackground">@color/bg_1</item>
+        <item name="colorSurface">@color/bg_2</item>
+        <item name="colorSurfaceVariant">@color/card</item>
+        <item name="colorOnSurface">@color/text</item>
+        <item name="colorOnSurfaceVariant">@color/muted</item>
+        <item name="colorPrimary">@color/accent</item>
+        <item name="colorOnPrimary">@color/bg_1</item>
+        <item name="colorPrimaryContainer">@color/card</item>
+        <item name="colorOnPrimaryContainer">@color/accent</item>
+        <item name="colorSecondary">@color/accent_2</item>
+        <item name="colorOnSecondary">@color/bg_1</item>
+        <item name="colorSecondaryContainer">@color/card</item>
+        <item name="colorOnSecondaryContainer">@color/accent_2</item>
+        <item name="colorOutline">@color/stroke</item>
+        <item name="colorError">@color/danger</item>
+
+        <!-- Shape -->
+        <item name="shapeAppearanceSmallComponent">@style/ShapeAppearance.Schautrack.SmallComponent</item>
+        <item name="shapeAppearanceMediumComponent">@style/ShapeAppearance.Schautrack.MediumComponent</item>
+        <item name="shapeAppearanceLargeComponent">@style/ShapeAppearance.Schautrack.LargeComponent</item>
+    </style>
+
+    <!-- Corner Radius -->
+    <style name="ShapeAppearance.Schautrack.SmallComponent" parent="ShapeAppearance.Material3.SmallComponent">
+        <item name="cornerSize">8dp</item>
+    </style>
+    <style name="ShapeAppearance.Schautrack.MediumComponent" parent="ShapeAppearance.Material3.MediumComponent">
+        <item name="cornerSize">10dp</item>
+    </style>
+    <style name="ShapeAppearance.Schautrack.LargeComponent" parent="ShapeAppearance.Material3.LargeComponent">
+        <item name="cornerSize">14dp</item>
     </style>
 </resources>

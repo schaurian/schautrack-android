@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
+import android.net.Uri
 import android.os.Bundle
 import android.view.KeyEvent
 import android.view.View
@@ -16,15 +17,19 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.textfield.TextInputEditText
+import com.google.android.material.textfield.TextInputLayout
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebViewFeature
 import to.schauer.schautrack.databinding.ActivityMainBinding
 
-private const val START_URL = "https://schautrack.schauer.to/"
+private const val DEFAULT_SERVER = "https://schautrack.schauer.to"
 private const val PREFS_NAME = "schautrack_prefs"
 private const val KEY_LAST_SEEN = "last_seen_at"
+private const val KEY_SERVER_URL = "server_url"
 private const val REFRESH_THRESHOLD_MS = 15 * 60 * 1000L
 
 class MainActivity : AppCompatActivity() {
@@ -32,6 +37,16 @@ class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private val prefs by lazy { getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE) }
     private var hasError = false
+    private var serverUrl: String = DEFAULT_SERVER
+
+    private fun getStartUrl(): String = "$serverUrl/"
+
+    private fun isAuthPage(url: String?): Boolean {
+        if (url == null) return false
+        val uri = Uri.parse(url)
+        val path = uri.path?.trimEnd('/') ?: return false
+        return path == "/login" || path == "/register"
+    }
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -39,6 +54,8 @@ class MainActivity : AppCompatActivity() {
         enableEdgeToEdge()
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+        serverUrl = prefs.getString(KEY_SERVER_URL, DEFAULT_SERVER) ?: DEFAULT_SERVER
 
         ViewCompat.setOnApplyWindowInsetsListener(binding.root) { view, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
@@ -81,6 +98,7 @@ class MainActivity : AppCompatActivity() {
                 if (!hasError) {
                     showContent()
                 }
+                updateChangeServerButtonVisibility(url)
             }
 
             override fun onReceivedError(
@@ -113,18 +131,75 @@ class MainActivity : AppCompatActivity() {
         binding.retryButton.setOnClickListener {
             hasError = false
             showLoading()
-            webView.loadUrl(START_URL)
+            webView.loadUrl(getStartUrl())
+        }
+
+        binding.changeServerButton.setOnClickListener {
+            showChangeServerDialog()
+        }
+
+        binding.errorChangeServerButton.setOnClickListener {
+            showChangeServerDialog()
         }
 
         if (savedInstanceState == null) {
             if (isNetworkAvailable()) {
-                webView.loadUrl(START_URL)
+                webView.loadUrl(getStartUrl())
             } else {
                 showError()
             }
         } else {
             showContent()
         }
+    }
+
+    private fun updateChangeServerButtonVisibility(url: String?) {
+        binding.changeServerButton.visibility = if (isAuthPage(url)) View.VISIBLE else View.GONE
+    }
+
+    private fun showChangeServerDialog() {
+        val currentUrl = binding.webView.url
+        val currentHost = if (currentUrl != null) {
+            val uri = Uri.parse(currentUrl)
+            "${uri.scheme}://${uri.host}"
+        } else {
+            serverUrl
+        }
+
+        val textInputLayout = TextInputLayout(this, null, com.google.android.material.R.attr.textInputOutlinedStyle).apply {
+            hint = getString(R.string.server_url)
+            layoutParams = android.widget.FrameLayout.LayoutParams(
+                android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                android.widget.FrameLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                setMargins(48, 32, 48, 0)
+            }
+        }
+
+        val input = TextInputEditText(textInputLayout.context).apply {
+            setText(currentHost)
+        }
+        textInputLayout.addView(input)
+
+        MaterialAlertDialogBuilder(this, R.style.Theme_Schautrack_Dialog)
+            .setTitle(R.string.change_server)
+            .setView(textInputLayout)
+            .setPositiveButton(R.string.connect) { _, _ ->
+                var newUrl = input.text.toString().trim()
+                if (newUrl.isNotEmpty()) {
+                    if (!newUrl.startsWith("http://") && !newUrl.startsWith("https://")) {
+                        newUrl = "https://$newUrl"
+                    }
+                    newUrl = newUrl.trimEnd('/')
+                    serverUrl = newUrl
+                    prefs.edit().putString(KEY_SERVER_URL, serverUrl).apply()
+                    hasError = false
+                    showLoading()
+                    binding.webView.loadUrl(getStartUrl())
+                }
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
     }
 
     private fun showLoading() {
