@@ -131,6 +131,21 @@ internal_release:
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
       when: on_success
 
+staging_release:
+  stage: internal_release
+  <<: *publish_template
+  needs:
+    - job: build_staging
+      artifacts: false
+  variables:
+    PLAY_TRACK: "internal"
+    PLAY_RELEASE_STATUS: "completed"
+  script:
+    - ./gradlew --no-daemon publishStagingReleaseBundle
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "staging"'
+      when: on_success
+
 beta_release:
   stage: beta_release
   <<: *publish_template
