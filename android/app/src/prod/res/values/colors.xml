@@ -1,0 +1,19 @@
+<resources>
+    <!-- Schautrack Design System -->
+    <color name="bg_1">#070d1a</color>
+    <color name="bg_2">#0a1220</color>
+    <color name="card">#0c1320</color>
+    <color name="stroke">#182030</color>
+    <color name="text">#e5e7eb</color>
+    <color name="muted">#9ca3af</color>
+    <color name="accent">#0ea5e9</color>
+    <color name="accent_2">#a855f7</color>
+    <color name="success">#16a34a</color>
+    <color name="danger">#ef4444</color>
+
+    <!-- Legacy/Compat -->
+    <color name="black">#000000</color>
+    <color name="white">#FFFFFF</color>
+    <color name="ic_launcher_background">#0a1220</color>
+    <color name="ic_launcher_foreground">#FFFFFF</color>
+</resources>

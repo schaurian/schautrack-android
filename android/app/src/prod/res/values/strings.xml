@@ -1,0 +1,11 @@
+<resources>
+    <string name="app_name">Schautrack</string>
+    <string name="loading">Loading…</string>
+    <string name="no_connection">No Connection</string>
+    <string name="check_internet">Please check your internet connection</string>
+    <string name="retry">Retry</string>
+    <string name="change_server">Change Server</string>
+    <string name="server_url">Server URL</string>
+    <string name="cancel">Cancel</string>
+    <string name="connect">Connect</string>
+</resources>
