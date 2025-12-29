@@ -39,7 +39,7 @@ android {
     productFlavors {
         create("staging") {
             dimension = "env"
-            applicationId = "to.schauer.schautrackstaging"
+            applicationId = "to.schauer.schautrack.staging"
             versionNameSuffix = "-staging"
             buildConfigField("String", "DEFAULT_SERVER", "\"https://staging-schautrack.schauer.to\"")
         }

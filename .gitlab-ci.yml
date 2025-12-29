@@ -52,7 +52,7 @@ cache:
     - cd android
     - chmod +x gradlew
 
-build_aab:
+build_prod:
   stage: build
   <<: *build_template
   script:
@@ -62,7 +62,7 @@ build_aab:
       - android/app/build/outputs/bundle/prodRelease/
     expire_in: 1 week
   rules:
-    - when: always
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
 
 build_staging:
   stage: build
