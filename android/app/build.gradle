@@ -56,12 +56,18 @@ android {
 
     signingConfigs {
         release {
-            if (System.getenv("ANDROID_UPLOAD_KEYSTORE")) {
-                storeFile = file(System.getenv("ANDROID_UPLOAD_KEYSTORE"))
+            def keystorePath = System.getenv("ANDROID_UPLOAD_KEYSTORE")
+            def keystoreFile = keystorePath ? file(keystorePath) : null
+            if (keystoreFile?.exists()) {
+                storeFile = keystoreFile
                 storePassword = System.getenv("ANDROID_UPLOAD_KEYSTORE_PASS") ?: ""
                 keyAlias = System.getenv("ANDROID_UPLOAD_KEY_ALIAS") ?: ""
                 keyPassword = System.getenv("ANDROID_UPLOAD_KEY_PASS") ?: ""
+            } else if (System.getenv("CI") || System.getenv("GITLAB_CI")) {
+                // In CI without keystore - will fail at signing step with clear error
+                storeFile = null
             } else {
+                // Local development - use debug signing
                 initWith(signingConfigs.debug)
             }
         }
@@ -75,7 +81,9 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.release
+            if (signingConfigs.release.storeFile != null) {
+                signingConfig = signingConfigs.release
+            }
         }
         debug {
             minifyEnabled = false
