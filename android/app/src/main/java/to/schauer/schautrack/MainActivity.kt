@@ -55,6 +55,7 @@ class MainActivity : AppCompatActivity() {
 
     private var fileChooserCallback: ValueCallback<Array<Uri>>? = null
     private var cameraImageUri: Uri? = null
+    private var pendingPermissionRequest: android.webkit.PermissionRequest? = null
     private lateinit var fileChooserLauncher: ActivityResultLauncher<Intent>
     private lateinit var permissionLauncher: ActivityResultLauncher<Array<String>>
 
@@ -77,6 +78,15 @@ class MainActivity : AppCompatActivity() {
 
         permissionLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
             val cameraGranted = permissions[Manifest.permission.CAMERA] == true
+            pendingPermissionRequest?.let { request ->
+                if (cameraGranted) {
+                    request.grant(request.resources)
+                } else {
+                    request.deny()
+                }
+                pendingPermissionRequest = null
+                return@registerForActivityResult
+            }
             if (cameraGranted) {
                 openFileChooserWithCamera()
             } else {
@@ -161,6 +171,22 @@ class MainActivity : AppCompatActivity() {
                     permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA))
                 }
                 return true
+            }
+
+            override fun onPermissionRequest(request: android.webkit.PermissionRequest?) {
+                request?.let {
+                    val requestedResources = it.resources
+                    if (requestedResources.contains(android.webkit.PermissionRequest.RESOURCE_VIDEO_CAPTURE)) {
+                        if (hasCameraPermission()) {
+                            it.grant(requestedResources)
+                        } else {
+                            pendingPermissionRequest = it
+                            permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA))
+                        }
+                    } else {
+                        it.grant(requestedResources)
+                    }
+                }
             }
         }
 
