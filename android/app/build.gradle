@@ -120,9 +120,17 @@ play {
 
     def statusEnv = System.getenv("PLAY_RELEASE_STATUS")?.toLowerCase()
     if (statusEnv) {
-        def status = statusEnv == "completed"
-                ? com.github.triplet.gradle.androidpublisher.ReleaseStatus.COMPLETED
-                : com.github.triplet.gradle.androidpublisher.ReleaseStatus.IN_PROGRESS
+        def status
+        switch (statusEnv) {
+            case "completed":
+                status = com.github.triplet.gradle.androidpublisher.ReleaseStatus.COMPLETED
+                break
+            case "draft":
+                status = com.github.triplet.gradle.androidpublisher.ReleaseStatus.DRAFT
+                break
+            default:
+                status = com.github.triplet.gradle.androidpublisher.ReleaseStatus.IN_PROGRESS
+        }
         releaseStatus.set(status)
     }
     def fractionEnv = System.getenv("PLAY_USER_FRACTION")
