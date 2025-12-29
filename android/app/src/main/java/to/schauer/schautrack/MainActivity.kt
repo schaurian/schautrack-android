@@ -1,14 +1,20 @@
 package to.schauer.schautrack
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.provider.MediaStore
 import android.view.KeyEvent
 import android.view.View
 import android.webkit.CookieManager
+import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
@@ -16,7 +22,11 @@ import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
@@ -25,6 +35,10 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebViewFeature
 import to.schauer.schautrack.databinding.ActivityMainBinding
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 private const val DEFAULT_SERVER = BuildConfig.DEFAULT_SERVER
 private const val PREFS_NAME = "schautrack_prefs"
@@ -39,6 +53,11 @@ class MainActivity : AppCompatActivity() {
     private var hasError = false
     private var serverUrl: String = DEFAULT_SERVER
 
+    private var fileChooserCallback: ValueCallback<Array<Uri>>? = null
+    private var cameraImageUri: Uri? = null
+    private lateinit var fileChooserLauncher: ActivityResultLauncher<Intent>
+    private lateinit var permissionLauncher: ActivityResultLauncher<Array<String>>
+
     private fun getStartUrl(): String = "$serverUrl/"
 
     private fun isAuthPage(url: String?): Boolean {
@@ -51,6 +70,20 @@ class MainActivity : AppCompatActivity() {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        fileChooserLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            handleFileChooserResult(result.resultCode, result.data)
+        }
+
+        permissionLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
+            val cameraGranted = permissions[Manifest.permission.CAMERA] == true
+            if (cameraGranted) {
+                openFileChooserWithCamera()
+            } else {
+                openFileChooserWithoutCamera()
+            }
+        }
+
         enableEdgeToEdge()
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
@@ -113,7 +146,23 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
-        webView.webChromeClient = WebChromeClient()
+        webView.webChromeClient = object : WebChromeClient() {
+            override fun onShowFileChooser(
+                webView: WebView?,
+                filePathCallback: ValueCallback<Array<Uri>>?,
+                fileChooserParams: FileChooserParams?
+            ): Boolean {
+                fileChooserCallback?.onReceiveValue(null)
+                fileChooserCallback = filePathCallback
+
+                if (hasCameraPermission()) {
+                    openFileChooserWithCamera()
+                } else {
+                    permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA))
+                }
+                return true
+            }
+        }
 
         binding.swipeRefresh.setOnRefreshListener {
             if (!webView.canGoBackOrForward(0)) {
@@ -254,5 +303,61 @@ class MainActivity : AppCompatActivity() {
     override fun onPause() {
         super.onPause()
         prefs.edit().putLong(KEY_LAST_SEEN, System.currentTimeMillis()).apply()
+    }
+
+    private fun hasCameraPermission(): Boolean {
+        return ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun createImageFile(): File {
+        val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+        val imageFileName = "JPEG_${timestamp}_"
+        val storageDir = cacheDir
+        return File.createTempFile(imageFileName, ".jpg", storageDir)
+    }
+
+    private fun openFileChooserWithCamera() {
+        val imageFile = createImageFile()
+        cameraImageUri = FileProvider.getUriForFile(
+            this,
+            "${packageName}.fileprovider",
+            imageFile
+        )
+
+        val cameraIntent = Intent(MediaStore.ACTION_IMAGE_CAPTURE).apply {
+            putExtra(MediaStore.EXTRA_OUTPUT, cameraImageUri)
+        }
+
+        val galleryIntent = Intent(Intent.ACTION_GET_CONTENT).apply {
+            type = "image/*"
+            addCategory(Intent.CATEGORY_OPENABLE)
+        }
+
+        val chooserIntent = Intent.createChooser(galleryIntent, getString(R.string.choose_image))
+        chooserIntent.putExtra(Intent.EXTRA_INITIAL_INTENTS, arrayOf(cameraIntent))
+
+        fileChooserLauncher.launch(chooserIntent)
+    }
+
+    private fun openFileChooserWithoutCamera() {
+        val galleryIntent = Intent(Intent.ACTION_GET_CONTENT).apply {
+            type = "image/*"
+            addCategory(Intent.CATEGORY_OPENABLE)
+        }
+
+        val chooserIntent = Intent.createChooser(galleryIntent, getString(R.string.choose_image))
+        fileChooserLauncher.launch(chooserIntent)
+    }
+
+    private fun handleFileChooserResult(resultCode: Int, data: Intent?) {
+        if (resultCode == RESULT_OK) {
+            val result = data?.data?.let { arrayOf(it) }
+                ?: cameraImageUri?.let { arrayOf(it) }
+            fileChooserCallback?.onReceiveValue(result)
+        } else {
+            fileChooserCallback?.onReceiveValue(null)
+        }
+        fileChooserCallback = null
+        cameraImageUri = null
     }
 }

@@ -8,4 +8,5 @@
     <string name="server_url">Server URL</string>
     <string name="cancel">Cancel</string>
     <string name="connect">Connect</string>
+    <string name="choose_image">Choose image</string>
 </resources>
