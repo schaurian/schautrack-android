@@ -26,7 +26,7 @@ import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebViewFeature
 import to.schauer.schautrack.databinding.ActivityMainBinding
 
-private const val DEFAULT_SERVER = "https://schautrack.schauer.to"
+private const val DEFAULT_SERVER = BuildConfig.DEFAULT_SERVER
 private const val PREFS_NAME = "schautrack_prefs"
 private const val KEY_LAST_SEEN = "last_seen_at"
 private const val KEY_SERVER_URL = "server_url"

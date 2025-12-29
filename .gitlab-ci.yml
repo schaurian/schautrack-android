@@ -61,6 +61,18 @@ build_aab:
   rules:
     - when: always
 
+build_staging:
+  stage: build
+  <<: *build_template
+  script:
+    - ./gradlew --no-daemon bundleStagingRelease
+  artifacts:
+    paths:
+      - android/app/build/outputs/bundle/stagingRelease/
+    expire_in: 1 week
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "staging"'
+
 semver-tag:
   stage: release
   image: alpine:3.19

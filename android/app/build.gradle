@@ -31,11 +31,18 @@ android {
         versionName = resolvedVersionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("String", "DEFAULT_SERVER", "\"https://schautrack.schauer.to\"")
     }
 
     flavorDimensions += "env"
 
     productFlavors {
+        create("staging") {
+            dimension = "env"
+            applicationId = "to.schauer.schautrackstaging"
+            versionNameSuffix = "-staging"
+            buildConfigField("String", "DEFAULT_SERVER", "\"https://staging-schautrack.schauer.to\"")
+        }
         create("beta") {
             dimension = "env"
             applicationId = "to.schauer.schautrackbeta"
