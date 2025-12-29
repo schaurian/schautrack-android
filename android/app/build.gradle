@@ -91,6 +91,7 @@ android {
     }
     buildFeatures {
         viewBinding = true
+        buildConfig = true
     }
 
     // Ensure variant-aware Play config works with flavors
