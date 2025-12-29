@@ -41,7 +41,7 @@ android {
             dimension = "env"
             applicationId = "to.schauer.schautrack.staging"
             versionNameSuffix = "-staging"
-            buildConfigField("String", "DEFAULT_SERVER", "\"https://staging-schautrack.schauer.to\"")
+            buildConfigField("String", "DEFAULT_SERVER", "\"https://schautrack-staging.schauer.to\"")
         }
         create("beta") {
             dimension = "env"
