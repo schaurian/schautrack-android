@@ -146,7 +146,7 @@ staging_release:
       artifacts: true
   variables:
     PLAY_TRACK: "internal"
-    PLAY_RELEASE_STATUS: "draft"  # TODO: change back to "completed" after first manual rollout
+    PLAY_RELEASE_STATUS: "completed"
   script:
     - VERSION=$(cat ../version.txt)
     - export VERSION_NAME="${VERSION#v}"
