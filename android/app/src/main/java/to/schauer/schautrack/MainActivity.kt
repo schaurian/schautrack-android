@@ -117,6 +117,7 @@ class MainActivity : AppCompatActivity() {
             domStorageEnabled = true
             cacheMode = WebSettings.LOAD_DEFAULT
             mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
+            mediaPlaybackRequiresUserGesture = false
             userAgentString = "$userAgentString SchautrackApp"
         }
 
@@ -174,17 +175,19 @@ class MainActivity : AppCompatActivity() {
             }
 
             override fun onPermissionRequest(request: android.webkit.PermissionRequest?) {
-                request?.let {
-                    val requestedResources = it.resources
-                    if (requestedResources.contains(android.webkit.PermissionRequest.RESOURCE_VIDEO_CAPTURE)) {
-                        if (hasCameraPermission()) {
-                            it.grant(requestedResources)
+                request?.let { req ->
+                    runOnUiThread {
+                        val requestedResources = req.resources
+                        if (requestedResources.contains(android.webkit.PermissionRequest.RESOURCE_VIDEO_CAPTURE)) {
+                            if (hasCameraPermission()) {
+                                req.grant(requestedResources)
+                            } else {
+                                pendingPermissionRequest = req
+                                permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA))
+                            }
                         } else {
-                            pendingPermissionRequest = it
-                            permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA))
+                            req.grant(requestedResources)
                         }
-                    } else {
-                        it.grant(requestedResources)
                     }
                 }
             }
