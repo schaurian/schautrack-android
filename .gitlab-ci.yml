@@ -51,30 +51,6 @@ cache:
     - cd android
     - chmod +x gradlew
 
-build_prod:
-  stage: build
-  <<: *build_template
-  script:
-    - ./gradlew --no-daemon --build-cache bundleProdRelease
-  artifacts:
-    paths:
-      - android/app/build/outputs/bundle/prodRelease/
-    expire_in: 1 week
-  rules:
-    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
-
-build_staging:
-  stage: build
-  <<: *build_template
-  script:
-    - ./gradlew --no-daemon --build-cache bundleStagingRelease
-  artifacts:
-    paths:
-      - android/app/build/outputs/bundle/stagingRelease/
-    expire_in: 1 week
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "staging"'
-
 semver-tag:
   stage: release
   image: alpine:3.19
@@ -135,11 +111,8 @@ internal_release:
       when: on_success
 
 staging_release:
-  stage: internal_release
+  stage: build
   <<: *publish_template
-  needs:
-    - job: build_staging
-      artifacts: true
   variables:
     PLAY_TRACK: "internal"
     PLAY_RELEASE_STATUS: "completed"
@@ -150,7 +123,6 @@ staging_release:
     - ./gradlew --no-daemon --build-cache publishStagingReleaseBundle
   rules:
     - if: '$CI_COMMIT_BRANCH == "staging"'
-      when: on_success
 
 beta_release:
   stage: beta_release
