@@ -116,8 +116,6 @@ semver-tag:
   rules:
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
       when: on_success
-    - if: '$CI_COMMIT_BRANCH == "staging"'
-      when: on_success
 
 internal_release:
   stage: internal_release
@@ -142,14 +140,13 @@ staging_release:
   needs:
     - job: build_staging
       artifacts: false
-    - job: semver-tag
-      artifacts: true
   variables:
     PLAY_TRACK: "internal"
     PLAY_RELEASE_STATUS: "completed"
   script:
-    - VERSION=$(cat ../version.txt)
-    - export VERSION_NAME="${VERSION#v}"
+    - export VERSION_NAME="0.0.${CI_PIPELINE_IID}"
+    - mkdir -p app/src/staging/play/release-notes/en-US
+    - git log -1 --format="%s%n%n%b" | head -c 500 > app/src/staging/play/release-notes/en-US/internal.txt
     - ./gradlew --no-daemon publishStagingReleaseBundle
   rules:
     - if: '$CI_COMMIT_BRANCH == "staging"'
