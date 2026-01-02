@@ -35,7 +35,7 @@
         android:background="@color/bg_1"
         android:gravity="center"
         android:orientation="vertical"
-        android:visibility="visible">
+        android:visibility="gone">
 
         <ProgressBar
             android:id="@+id/progressBar"

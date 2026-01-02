@@ -79,10 +79,12 @@ class MainActivity : AppCompatActivity() {
         permissionLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
             val cameraGranted = permissions[Manifest.permission.CAMERA] == true
             pendingPermissionRequest?.let { request ->
-                if (cameraGranted) {
-                    request.grant(request.resources)
-                } else {
-                    request.deny()
+                runOnUiThread {
+                    if (cameraGranted) {
+                        request.grant(arrayOf(android.webkit.PermissionRequest.RESOURCE_VIDEO_CAPTURE))
+                    } else {
+                        request.deny()
+                    }
                 }
                 pendingPermissionRequest = null
                 return@registerForActivityResult
@@ -180,7 +182,7 @@ class MainActivity : AppCompatActivity() {
                         val requestedResources = req.resources
                         if (requestedResources.contains(android.webkit.PermissionRequest.RESOURCE_VIDEO_CAPTURE)) {
                             if (hasCameraPermission()) {
-                                req.grant(requestedResources)
+                                req.grant(arrayOf(android.webkit.PermissionRequest.RESOURCE_VIDEO_CAPTURE))
                             } else {
                                 pendingPermissionRequest = req
                                 permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA))
@@ -221,12 +223,14 @@ class MainActivity : AppCompatActivity() {
         }
 
         if (savedInstanceState == null) {
+            showLoading()
             if (isNetworkAvailable()) {
                 webView.loadUrl(getStartUrl())
             } else {
                 showError()
             }
         } else {
+            webView.restoreState(savedInstanceState)
             showContent()
         }
     }
