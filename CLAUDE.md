@@ -1,5 +1,11 @@
 # Claude Code Guidelines
 
+## Workflow Rules
+
+- **Strict Branching:** NEVER change anything directly on the `main` branch.
+- **Development Branch:** ALWAYS make changes on the `staging` branch.
+- **Production Deploy:** ONLY merge/push to `main` when explicitly instructed by the user.
+
 ## Version Requirements
 
 - Always verify that SDK versions, dependencies, and API targets are current before making changes
