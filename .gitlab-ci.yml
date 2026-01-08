@@ -2,8 +2,6 @@ stages:
   - build
   - release
   - internal_release
-  - beta_release
-  - production_release
 
 variables:
   ANDROID_SDK_ROOT: "/opt/android-sdk-linux"
@@ -136,50 +134,5 @@ staging_release:
         - scripts/**/*
         - .gitlab-ci.yml
 
-beta_release:
-  stage: beta_release
-  <<: *publish_template
-  needs:
-    - job: internal_release
-      artifacts: false
-    - job: semver-tag
-      artifacts: true
-  variables:
-    PLAY_TRACK: "beta"
-    PLAY_RELEASE_STATUS: "completed"
-  script:
-    - VERSION=$(cat ../version.txt)
-    - export VERSION_NAME="${VERSION#v}"
-    - ./gradlew --no-daemon --build-cache publishProdReleaseBundle
-  rules:
-    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
-      changes:
-        - android/**/*
-        - scripts/**/*
-        - .gitlab-ci.yml
-      when: on_success
 
-production_release:
-  stage: production_release
-  <<: *publish_template
-  needs:
-    - job: semver-tag
-      artifacts: true
-  variables:
-    PLAY_TRACK: "production"
-    PLAY_USER_FRACTION: $PLAY_STAGED_PERCENT
-  when: manual
-  allow_failure: false
-  script:
-    - VERSION=$(cat ../version.txt)
-    - export VERSION_NAME="${VERSION#v}"
-    - export PLAY_RELEASE_STATUS="inprogress"
-    - ./gradlew --no-daemon --build-cache publishProdReleaseBundle
-  rules:
-    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
-      changes:
-        - android/**/*
-        - scripts/**/*
-        - .gitlab-ci.yml
-      when: manual
 # Trigger build
