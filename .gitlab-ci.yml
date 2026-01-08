@@ -104,7 +104,7 @@ internal_release:
     - job: semver-tag
       artifacts: true
   variables:
-    PLAY_TRACK: "internal"
+    PLAY_TRACK: "alpha"
     PLAY_RELEASE_STATUS: "completed"
   script:
     - VERSION=$(cat ../version.txt)
