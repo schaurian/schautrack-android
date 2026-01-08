@@ -91,6 +91,10 @@ semver-tag:
     expire_in: 1 week
   rules:
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      changes:
+        - android/**/*
+        - scripts/**/*
+        - .gitlab-ci.yml
       when: on_success
 
 internal_release:
@@ -108,6 +112,10 @@ internal_release:
     - ./gradlew --no-daemon --build-cache publishProdReleaseBundle
   rules:
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      changes:
+        - android/**/*
+        - scripts/**/*
+        - .gitlab-ci.yml
       when: on_success
 
 staging_release:
@@ -123,6 +131,10 @@ staging_release:
     - ./gradlew --no-daemon --build-cache publishStagingReleaseBundle
   rules:
     - if: '$CI_COMMIT_BRANCH == "staging"'
+      changes:
+        - android/**/*
+        - scripts/**/*
+        - .gitlab-ci.yml
 
 beta_release:
   stage: beta_release
@@ -142,6 +154,10 @@ beta_release:
     - ./gradlew --no-daemon --build-cache publishProdReleaseBundle
   rules:
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      changes:
+        - android/**/*
+        - scripts/**/*
+        - .gitlab-ci.yml
       when: manual
 
 production_release:
@@ -162,4 +178,8 @@ production_release:
     - ./gradlew --no-daemon --build-cache publishProdReleaseBundle
   rules:
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      changes:
+        - android/**/*
+        - scripts/**/*
+        - .gitlab-ci.yml
       when: manual
