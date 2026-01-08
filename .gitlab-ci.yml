@@ -1,7 +1,7 @@
 stages:
   - build
   - release
-  - internal_release
+  - main_release
 
 variables:
   ANDROID_SDK_ROOT: "/opt/android-sdk-linux"
@@ -95,8 +95,8 @@ semver-tag:
         - .gitlab-ci.yml
       when: on_success
 
-internal_release:
-  stage: internal_release
+main_release:
+  stage: main_release
   <<: *publish_template
   needs:
     - job: semver-tag
