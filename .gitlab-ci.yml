@@ -183,3 +183,4 @@ production_release:
         - scripts/**/*
         - .gitlab-ci.yml
       when: manual
+# Trigger build
