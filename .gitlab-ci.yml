@@ -147,7 +147,6 @@ beta_release:
   variables:
     PLAY_TRACK: "beta"
     PLAY_RELEASE_STATUS: "completed"
-  when: manual
   script:
     - VERSION=$(cat ../version.txt)
     - export VERSION_NAME="${VERSION#v}"
@@ -158,7 +157,7 @@ beta_release:
         - android/**/*
         - scripts/**/*
         - .gitlab-ci.yml
-      when: manual
+      when: on_success
 
 production_release:
   stage: production_release
