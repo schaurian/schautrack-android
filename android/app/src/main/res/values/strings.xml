@@ -9,4 +9,6 @@
     <string name="cancel">Cancel</string>
     <string name="connect">Connect</string>
     <string name="choose_image">Choose image</string>
+    <string name="invalid_server">Not a valid Schautrack server</string>
+    <string name="validating_server">Validating server…</string>
 </resources>

@@ -35,7 +35,14 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebViewFeature
 import to.schauer.schautrack.databinding.ActivityMainBinding
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
 import java.io.File
+import java.net.HttpURLConnection
+import java.net.URL
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -283,15 +290,53 @@ class MainActivity : AppCompatActivity() {
                         newUrl = "https://$newUrl"
                     }
                     newUrl = newUrl.trimEnd('/')
-                    serverUrl = newUrl
-                    prefs.edit().putString(KEY_SERVER_URL, serverUrl).apply()
-                    hasError = false
-                    showLoading()
-                    binding.webView.loadUrl(getStartUrl())
+                    validateAndConnectToServer(newUrl)
                 }
             }
             .setNegativeButton(R.string.cancel, null)
             .show()
+    }
+
+    private fun validateAndConnectToServer(newUrl: String) {
+        binding.loadingText.text = getString(R.string.validating_server)
+        showLoading()
+
+        CoroutineScope(Dispatchers.IO).launch {
+            val isValid = try {
+                val url = URL("$newUrl/api/health")
+                val connection = url.openConnection() as HttpURLConnection
+                connection.connectTimeout = 10000
+                connection.readTimeout = 10000
+                connection.requestMethod = "GET"
+
+                if (connection.responseCode == 200) {
+                    val response = connection.inputStream.bufferedReader().readText()
+                    val json = JSONObject(response)
+                    json.optString("app") == "schautrack"
+                } else {
+                    false
+                }
+            } catch (e: Exception) {
+                false
+            }
+
+            withContext(Dispatchers.Main) {
+                binding.loadingText.text = getString(R.string.loading)
+                if (isValid) {
+                    serverUrl = newUrl
+                    prefs.edit().putString(KEY_SERVER_URL, serverUrl).apply()
+                    hasError = false
+                    binding.webView.loadUrl(getStartUrl())
+                } else {
+                    showContent()
+                    MaterialAlertDialogBuilder(this@MainActivity, R.style.Theme_Schautrack_Dialog)
+                        .setTitle(R.string.invalid_server)
+                        .setMessage(newUrl)
+                        .setPositiveButton(android.R.string.ok, null)
+                        .show()
+                }
+            }
+        }
     }
 
     private fun showLoading() {
