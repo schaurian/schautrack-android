@@ -129,7 +129,17 @@ class MainActivity : AppCompatActivity() {
 
         webView.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
-                return false
+                val url = request?.url ?: return false
+                val serverHost = Uri.parse(serverUrl).host ?: return false
+
+                // Allow navigation within the configured server
+                if (url.host == serverHost) {
+                    return false
+                }
+
+                // Open external links in system browser
+                startActivity(Intent(Intent.ACTION_VIEW, url))
+                return true
             }
 
             override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
