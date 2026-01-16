@@ -38,7 +38,7 @@ jobs:
           VERSION=$(scripts/bump-version.sh)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "version_name=${VERSION#v}" >> $GITHUB_OUTPUT
-          echo "code=$(date +%y%m%d%H%M)" >> $GITHUB_OUTPUT
+          echo "code=$(date +%s)" >> $GITHUB_OUTPUT
           scripts/generate-changelog.sh "$VERSION" > changelog.md
 
       - name: Create tag
