@@ -15,13 +15,13 @@
 ## Key Files
 
 - `android/app/build.gradle` - SDK versions and dependencies
-- `.gitlab-ci.yml` - CI/CD pipeline and Docker image version
+- `.github/workflows/` - GitHub Actions CI/CD workflows
 - `android/app/src/main/java/to/schauer/schautrack/MainActivity.kt` - Main app code
 
 ## CI/CD
 
-- The CI image version should match the target SDK (e.g., `ghcr.io/cirruslabs/android-sdk:35`)
-- Required GitLab CI/CD variables for Google Play publishing:
+- GitHub Actions workflows handle building and publishing to Google Play
+- Required GitHub secrets for Google Play publishing:
   - `PLAY_SERVICE_ACCOUNT_JSON_B64`
   - `ANDROID_UPLOAD_KEYSTORE_B64`
   - `ANDROID_UPLOAD_KEYSTORE_PASS`
