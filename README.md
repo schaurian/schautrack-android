@@ -30,7 +30,7 @@ By default, the app connects to [schautrack.schauer.to](https://schautrack.schau
 
 ## Related Projects
 
-- [Schautrack Web App](https://schautrack.schauer.to)
+- [Schautrack](https://github.com/schaurian/schautrack)
 
 ## Building
 
