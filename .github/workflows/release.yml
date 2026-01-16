@@ -38,6 +38,7 @@ jobs:
           VERSION=$(scripts/bump-version.sh)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "version_name=${VERSION#v}" >> $GITHUB_OUTPUT
+          echo "code=$(date +%y%m%d%H%M)" >> $GITHUB_OUTPUT
           scripts/generate-changelog.sh "$VERSION" > changelog.md
 
       - name: Create tag
@@ -66,6 +67,7 @@ jobs:
           PLAY_TRACK: alpha
           PLAY_RELEASE_STATUS: completed
           VERSION_NAME: ${{ steps.version.outputs.version_name }}
+          VERSION_CODE: ${{ steps.version.outputs.code }}
         run: |
           chmod +x gradlew
           ./gradlew --no-daemon --build-cache publishProdReleaseBundle
