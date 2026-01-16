@@ -5,7 +5,7 @@
 <h1 align="center">Schautrack Android</h1>
 
 <p align="center">
-  The official Android app for <a href="https://schautrack.schauer.to">Schautrack</a> - an open-source, AI-powered calorie tracker.
+  The Android app for <a href="https://schautrack.schauer.to">Schautrack</a> - a self-hostable, open-source, AI-powered calorie tracker for you and your friends.
 </p>
 
 <p align="center">
