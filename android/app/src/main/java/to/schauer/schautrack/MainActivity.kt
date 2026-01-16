@@ -66,7 +66,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var fileChooserLauncher: ActivityResultLauncher<Intent>
     private lateinit var permissionLauncher: ActivityResultLauncher<Array<String>>
 
-    private fun getStartUrl(): String = "$serverUrl/"
+    private fun getStartUrl(): String = "$serverUrl/dashboard"
 
     private fun isAuthPage(url: String?): Boolean {
         if (url == null) return false
