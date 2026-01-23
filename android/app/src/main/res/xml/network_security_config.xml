@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
     <domain-config cleartextTrafficPermitted="false">
-        <domain includeSubdomains="true">schautrack.schauer.to</domain>
-        <domain includeSubdomains="true">schautrack-staging.schauer.to</domain>
+        <domain includeSubdomains="true">schautrack.com</domain>
+        <domain includeSubdomains="true">staging.schautrack.com</domain>
     </domain-config>
 </network-security-config>

@@ -5,7 +5,7 @@
 <h1 align="center">Schautrack Android</h1>
 
 <p align="center">
-  The Android app for <a href="https://schautrack.schauer.to">Schautrack</a> - a self-hostable, open-source, AI-powered calorie tracker for you and your friends.
+  The Android app for <a href="https://schautrack.com">Schautrack</a> - a self-hostable, open-source, AI-powered calorie tracker for you and your friends.
 </p>
 
 <p align="center">
@@ -18,7 +18,7 @@
 
 This is a native Android wrapper for the Schautrack web application. It provides a seamless mobile experience with native features like camera access for food scanning.
 
-By default, the app connects to [schautrack.schauer.to](https://schautrack.schauer.to), but you can change the server URL on the login screen to use your own self-hosted instance.
+By default, the app connects to [schautrack.com](https://schautrack.com), but you can change the server URL on the login screen to use your own self-hosted instance.
 
 ## Screenshots
 
