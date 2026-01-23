@@ -1,0 +1,21 @@
+version: 2
+updates:
+  - package-ecosystem: "gradle"
+    directory: "/android"
+    schedule:
+      interval: "weekly"
+      day: "friday"
+      timezone: "Europe/Berlin"
+    target-branch: "staging"
+    labels:
+      - "dependencies"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "friday"
+      timezone: "Europe/Berlin"
+    target-branch: "staging"
+    labels:
+      - "dependencies"
