@@ -242,7 +242,7 @@ class MainActivity : AppCompatActivity() {
         if (savedInstanceState == null) {
             showLoading()
             if (isNetworkAvailable()) {
-                webView.loadUrl(getStartUrl())
+                checkServerHealthAndLoad()
             } else {
                 showError()
             }
@@ -362,6 +362,37 @@ class MainActivity : AppCompatActivity() {
         val network = connectivityManager.activeNetwork ?: return false
         val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
         return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+    }
+
+    private fun checkServerHealthAndLoad() {
+        CoroutineScope(Dispatchers.IO).launch {
+            val isHealthy = try {
+                val url = URL("$serverUrl/api/health")
+                val connection = url.openConnection() as HttpURLConnection
+                connection.connectTimeout = 10000
+                connection.readTimeout = 10000
+                connection.requestMethod = "GET"
+
+                if (connection.responseCode == 200) {
+                    val response = connection.inputStream.bufferedReader().readText()
+                    val json = JSONObject(response)
+                    json.optString("app") == "schautrack"
+                } else {
+                    false
+                }
+            } catch (e: Exception) {
+                false
+            }
+
+            withContext(Dispatchers.Main) {
+                if (isHealthy) {
+                    binding.webView.loadUrl(getStartUrl())
+                } else {
+                    hasError = true
+                    showError()
+                }
+            }
+        }
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
