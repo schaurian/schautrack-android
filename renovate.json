@@ -5,8 +5,6 @@
   ],
   "baseBranches": ["staging"],
   "labels": ["dependencies"],
-  "schedule": ["before 8am on friday"],
-  "timezone": "Europe/Berlin",
   "packageRules": [
     {
       "matchUpdateTypes": ["minor", "patch"],
