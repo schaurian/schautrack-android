@@ -31,7 +31,7 @@ android {
         versionName = resolvedVersionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        buildConfigField("String", "DEFAULT_SERVER", "\"https://schautrack.schauer.to\"")
+        buildConfigField("String", "DEFAULT_SERVER", "\"https://schautrack.com\"")
     }
 
     flavorDimensions += "env"
@@ -41,7 +41,7 @@ android {
             dimension = "env"
             applicationId = "to.schauer.schautrack.staging"
             versionNameSuffix = "-staging"
-            buildConfigField("String", "DEFAULT_SERVER", "\"https://schautrack-staging.schauer.to\"")
+            buildConfigField("String", "DEFAULT_SERVER", "\"https://staging.schautrack.com\"")
         }
 
         create("prod") {
