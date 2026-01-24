@@ -104,6 +104,18 @@ android {
         variant.outputs.configureEach { output ->
             output.versionNameOverride = variant.versionName
             output.versionCodeOverride = variant.versionCode
+
+            // Name APKs as schautrack-[version].apk for prod release, include flavor for others
+            def baseName = "schautrack"
+            def flavorName = variant.flavorName
+            def buildType = variant.buildType.name
+            def version = variant.versionName
+
+            if (flavorName == "prod" && buildType == "release") {
+                outputFileName = "${baseName}-${version}.apk"
+            } else {
+                outputFileName = "${baseName}-${flavorName}-${buildType}-${version}.apk"
+            }
         }
     }
 }
