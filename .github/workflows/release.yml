@@ -73,7 +73,7 @@ jobs:
           VERSION_CODE: ${{ steps.version.outputs.code }}
         run: |
           chmod +x gradlew
-          ./gradlew --no-daemon --build-cache publishProdReleaseBundle
+          ./gradlew --no-daemon --build-cache publishProdReleaseBundle assembleProdRelease
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -81,6 +81,7 @@ jobs:
           tag_name: ${{ steps.version.outputs.version }}
           name: ${{ steps.version.outputs.version }}
           body_path: changelog.md
+          files: android/app/build/outputs/apk/prod/release/schautrack-${{ steps.version.outputs.version_name }}.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -88,4 +89,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: release-apk
-          path: android/app/build/outputs/
+          path: android/app/build/outputs/apk/prod/release/schautrack-${{ steps.version.outputs.version_name }}.apk
