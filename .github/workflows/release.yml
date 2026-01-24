@@ -86,7 +86,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: release-apk
           path: android/app/build/outputs/apk/prod/release/schautrack-${{ steps.version.outputs.version_name }}.apk

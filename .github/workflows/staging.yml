@@ -62,7 +62,7 @@ jobs:
           ./gradlew --no-daemon --build-cache publishStagingReleaseBundle
 
       - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: staging-apk
           path: android/app/build/outputs/
