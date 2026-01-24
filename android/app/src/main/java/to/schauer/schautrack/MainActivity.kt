@@ -171,8 +171,21 @@ class MainActivity : AppCompatActivity() {
             ) {
                 super.onReceivedError(view, request, error)
                 if (request?.isForMainFrame == true) {
-                    hasError = true
-                    showError()
+                    verifyHealthAndShowError()
+                }
+            }
+
+            override fun onReceivedHttpError(
+                view: WebView?,
+                request: WebResourceRequest?,
+                errorResponse: android.webkit.WebResourceResponse?
+            ) {
+                super.onReceivedHttpError(view, request, errorResponse)
+                if (request?.isForMainFrame == true) {
+                    val statusCode = errorResponse?.statusCode ?: 0
+                    if (statusCode >= 500) {
+                        verifyHealthAndShowError()
+                    }
                 }
             }
         }
@@ -355,6 +368,39 @@ class MainActivity : AppCompatActivity() {
         binding.loadingView.visibility = View.GONE
         binding.errorView.visibility = View.VISIBLE
         binding.swipeRefresh.visibility = View.GONE
+    }
+
+    private fun verifyHealthAndShowError() {
+        CoroutineScope(Dispatchers.IO).launch {
+            val isHealthy = checkHealth()
+
+            withContext(Dispatchers.Main) {
+                if (!isHealthy) {
+                    hasError = true
+                    showError()
+                }
+            }
+        }
+    }
+
+    private fun checkHealth(): Boolean {
+        return try {
+            val url = URL("$serverUrl/api/health")
+            val connection = url.openConnection() as HttpURLConnection
+            connection.connectTimeout = 5000
+            connection.readTimeout = 5000
+            connection.requestMethod = "GET"
+
+            if (connection.responseCode == 200) {
+                val response = connection.inputStream.bufferedReader().readText()
+                val json = JSONObject(response)
+                json.optString("app") == "schautrack"
+            } else {
+                false
+            }
+        } catch (e: Exception) {
+            false
+        }
     }
 
     private fun isNetworkAvailable(): Boolean {
