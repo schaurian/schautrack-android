@@ -53,7 +53,7 @@ jobs:
           ANDROID_UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
           ANDROID_UPLOAD_KEY_PASS: ${{ secrets.ANDROID_UPLOAD_KEY_PASS }}
           PLAY_SERVICE_ACCOUNT_JSON: ${{ github.workspace }}/service-account.json
-          PLAY_TRACK: alpha
+          PLAY_TRACK: internal
           PLAY_RELEASE_STATUS: completed
           VERSION_NAME: 0.0.${{ github.run_number }}
           VERSION_CODE: ${{ steps.version.outputs.code }}
