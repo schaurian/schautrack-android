@@ -102,7 +102,7 @@ main_release:
     - job: semver-tag
       artifacts: true
   variables:
-    PLAY_TRACK: "internal"
+    PLAY_TRACK: "alpha"
     PLAY_RELEASE_STATUS: "completed"
   script:
     - VERSION=$(cat ../version.txt)
@@ -120,7 +120,7 @@ staging_release:
   stage: build
   <<: *publish_template
   variables:
-    PLAY_TRACK: "internal"
+    PLAY_TRACK: "alpha"
     PLAY_RELEASE_STATUS: "completed"
   script:
     - export VERSION_NAME="0.0.${CI_PIPELINE_IID}"
