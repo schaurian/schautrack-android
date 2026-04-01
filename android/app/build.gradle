@@ -1,6 +1,5 @@
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
     id("com.github.triplet.play")
 }
 
@@ -91,30 +90,38 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions {
-        jvmTarget = "17"
-    }
     buildFeatures {
         viewBinding = true
         buildConfig = true
     }
 
-    // Ensure variant-aware Play config works with flavors
-    applicationVariants.configureEach { variant ->
-        variant.outputs.configureEach { output ->
-            output.versionNameOverride = variant.versionName
-            output.versionCodeOverride = variant.versionCode
+}
 
-            // Name APKs as schautrack-[version].apk for prod release, include flavor for others
-            def baseName = "schautrack"
-            def flavorName = variant.flavorName
-            def buildType = variant.buildType.name
-            def version = variant.versionName
-
-            if (flavorName == "prod" && buildType == "release") {
-                outputFileName = "${baseName}-${version}.apk"
-            } else {
-                outputFileName = "${baseName}-${flavorName}-${buildType}-${version}.apk"
+// Rename APK outputs after assembly to match expected naming convention
+androidComponents {
+    onVariants(selector().all()) { variant ->
+        tasks.configureEach { task ->
+            if (task.name == "assemble${variant.name.capitalize()}") {
+                task.doLast {
+                    def apkDir = file("${buildDir}/outputs/apk/${variant.flavorName}/${variant.buildType}")
+                    if (apkDir.exists()) {
+                        apkDir.listFiles()?.findAll { it.name.endsWith(".apk") }?.each { apkFile ->
+                            def baseName = "schautrack"
+                            def newName
+                            if (variant.flavorName == "prod" && variant.buildType == "release") {
+                                newName = "${baseName}-${resolvedVersionName}.apk"
+                            } else {
+                                def versionName = variant.flavorName == "staging" ?
+                                    "${resolvedVersionName}-staging" : resolvedVersionName
+                                newName = "${baseName}-${variant.flavorName}-${variant.buildType}-${versionName}.apk"
+                            }
+                            def newFile = new File(apkFile.parentFile, newName)
+                            if (apkFile.name != newName) {
+                                apkFile.renameTo(newFile)
+                            }
+                        }
+                    }
+                }
             }
         }
     }
