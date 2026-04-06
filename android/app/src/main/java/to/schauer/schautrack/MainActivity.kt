@@ -201,10 +201,13 @@ class MainActivity : AppCompatActivity() {
                 request: WebResourceRequest?,
                 error: WebResourceError?
             ) {
-                super.onReceivedError(view, request, error)
                 if (request?.isForMainFrame == true) {
-                    verifyHealthAndShowError()
+                    hasError = true
+                    showLoading()
+                    verifyHealthAndRetry()
+                    return
                 }
+                super.onReceivedError(view, request, error)
             }
 
             override fun onReceivedHttpError(
@@ -212,13 +215,16 @@ class MainActivity : AppCompatActivity() {
                 request: WebResourceRequest?,
                 errorResponse: android.webkit.WebResourceResponse?
             ) {
-                super.onReceivedHttpError(view, request, errorResponse)
                 if (request?.isForMainFrame == true) {
                     val statusCode = errorResponse?.statusCode ?: 0
                     if (statusCode >= 500) {
-                        verifyHealthAndShowError()
+                        hasError = true
+                        showLoading()
+                        verifyHealthAndRetry()
+                        return
                     }
                 }
+                super.onReceivedHttpError(view, request, errorResponse)
             }
 
             override fun onRenderProcessGone(view: WebView?, detail: android.webkit.RenderProcessGoneDetail?): Boolean {
@@ -399,12 +405,15 @@ class MainActivity : AppCompatActivity() {
         binding.swipeRefresh.visibility = View.GONE
     }
 
-    private fun verifyHealthAndShowError() {
+    private fun verifyHealthAndRetry() {
         CoroutineScope(Dispatchers.IO).launch {
             val isHealthy = checkHealth()
 
             withContext(Dispatchers.Main) {
-                if (!isHealthy) {
+                if (isHealthy) {
+                    hasError = false
+                    webView.loadUrl(getStartUrl())
+                } else {
                     hasError = true
                     showError()
                 }
