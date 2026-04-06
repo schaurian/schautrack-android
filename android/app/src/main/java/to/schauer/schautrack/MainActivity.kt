@@ -8,7 +8,6 @@ import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
 import android.view.KeyEvent
@@ -59,6 +58,7 @@ class MainActivity : AppCompatActivity() {
     private val prefs by lazy { getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE) }
     private var hasError = false
     private var serverUrl: String = DEFAULT_SERVER
+    private lateinit var webView: WebView
 
     private var fileChooserCallback: ValueCallback<Array<Uri>>? = null
     private var cameraImageUri: Uri? = null
@@ -115,13 +115,47 @@ class MainActivity : AppCompatActivity() {
             insets
         }
 
-        val webView = binding.webView
+        webView = binding.webView
+        setupWebView(webView)
 
+        binding.retryButton.setOnClickListener {
+            hasError = false
+            showLoading()
+            webView.loadUrl(getStartUrl())
+        }
+
+        binding.changeServerButton.setOnClickListener {
+            showChangeServerDialog()
+        }
+
+        binding.errorChangeServerButton.setOnClickListener {
+            showChangeServerDialog()
+        }
+
+        if (savedInstanceState == null) {
+            showLoading()
+            if (isNetworkAvailable()) {
+                checkServerHealthAndLoad()
+            } else {
+                showError()
+            }
+        } else {
+            webView.restoreState(savedInstanceState)
+            showContent()
+        }
+    }
+
+    private fun updateChangeServerButtonVisibility(url: String?) {
+        binding.changeServerButton.visibility = if (isAuthPage(url)) View.VISIBLE else View.GONE
+    }
+
+    @SuppressLint("SetJavaScriptEnabled")
+    private fun setupWebView(wv: WebView) {
         CookieManager.getInstance().apply {
             setAcceptCookie(true)
-            setAcceptThirdPartyCookies(webView, true)
+            setAcceptThirdPartyCookies(wv, true)
         }
-        webView.settings.apply {
+        wv.settings.apply {
             javaScriptEnabled = true
             domStorageEnabled = true
             cacheMode = WebSettings.LOAD_DEFAULT
@@ -131,20 +165,18 @@ class MainActivity : AppCompatActivity() {
         }
 
         if (WebViewFeature.isFeatureSupported(WebViewFeature.ALGORITHMIC_DARKENING)) {
-            WebSettingsCompat.setAlgorithmicDarkeningAllowed(webView.settings, false)
+            WebSettingsCompat.setAlgorithmicDarkeningAllowed(wv.settings, false)
         }
 
-        webView.webViewClient = object : WebViewClient() {
+        wv.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                 val url = request?.url ?: return false
                 val serverHost = Uri.parse(serverUrl).host ?: return false
 
-                // Allow navigation within the configured server
                 if (url.host == serverHost) {
                     return false
                 }
 
-                // Open external links in system browser
                 startActivity(Intent(Intent.ACTION_VIEW, url))
                 return true
             }
@@ -188,8 +220,13 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
             }
+
+            override fun onRenderProcessGone(view: WebView?, detail: android.webkit.RenderProcessGoneDetail?): Boolean {
+                recreateWebView()
+                return true
+            }
         }
-        webView.webChromeClient = object : WebChromeClient() {
+        wv.webChromeClient = object : WebChromeClient() {
             override fun onShowFileChooser(
                 webView: WebView?,
                 filePathCallback: ValueCallback<Array<Uri>>?,
@@ -226,51 +263,43 @@ class MainActivity : AppCompatActivity() {
         }
 
         binding.swipeRefresh.setOnRefreshListener {
-            if (!webView.canGoBackOrForward(0)) {
+            if (!wv.canGoBackOrForward(0)) {
                 binding.swipeRefresh.isRefreshing = false
                 return@setOnRefreshListener
             }
             hasError = false
-            webView.reload()
+            wv.reload()
         }
 
-        webView.setOnScrollChangeListener { _, _, scrollY, _, _ ->
+        wv.setOnScrollChangeListener { _, _, scrollY, _, _ ->
             binding.swipeRefresh.isEnabled = scrollY == 0
-        }
-
-        binding.retryButton.setOnClickListener {
-            hasError = false
-            showLoading()
-            webView.loadUrl(getStartUrl())
-        }
-
-        binding.changeServerButton.setOnClickListener {
-            showChangeServerDialog()
-        }
-
-        binding.errorChangeServerButton.setOnClickListener {
-            showChangeServerDialog()
-        }
-
-        if (savedInstanceState == null) {
-            showLoading()
-            if (isNetworkAvailable()) {
-                checkServerHealthAndLoad()
-            } else {
-                showError()
-            }
-        } else {
-            webView.restoreState(savedInstanceState)
-            showContent()
         }
     }
 
-    private fun updateChangeServerButtonVisibility(url: String?) {
-        binding.changeServerButton.visibility = if (isAuthPage(url)) View.VISIBLE else View.GONE
+    private fun recreateWebView() {
+        // Remove the dead WebView
+        binding.swipeRefresh.removeView(webView)
+        webView.destroy()
+
+        // Create a fresh WebView and add it to the layout
+        val newWebView = WebView(this).apply {
+            layoutParams = android.view.ViewGroup.LayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT
+            )
+        }
+        binding.swipeRefresh.addView(newWebView, 0)
+        webView = newWebView
+        setupWebView(webView)
+
+        // Reload from scratch
+        hasError = false
+        showLoading()
+        webView.loadUrl(getStartUrl())
     }
 
     private fun showChangeServerDialog() {
-        val currentUrl = binding.webView.url
+        val currentUrl = webView.url
         val currentHost = if (currentUrl != null) {
             val uri = Uri.parse(currentUrl)
             "${uri.scheme}://${uri.host}"
@@ -339,7 +368,7 @@ class MainActivity : AppCompatActivity() {
                     serverUrl = newUrl
                     prefs.edit().putString(KEY_SERVER_URL, serverUrl).apply()
                     hasError = false
-                    binding.webView.loadUrl(getStartUrl())
+                    webView.loadUrl(getStartUrl())
                 } else {
                     showContent()
                     MaterialAlertDialogBuilder(this@MainActivity, R.style.Theme_Schautrack_Dialog)
@@ -432,7 +461,7 @@ class MainActivity : AppCompatActivity() {
 
             withContext(Dispatchers.Main) {
                 if (isHealthy) {
-                    binding.webView.loadUrl(getStartUrl())
+                    webView.loadUrl(getStartUrl())
                 } else {
                     hasError = true
                     showError()
@@ -442,8 +471,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        if (keyCode == KeyEvent.KEYCODE_BACK && binding.webView.canGoBack()) {
-            binding.webView.goBack()
+        if (keyCode == KeyEvent.KEYCODE_BACK && webView.canGoBack()) {
+            webView.goBack()
             return true
         }
         return super.onKeyDown(keyCode, event)
@@ -451,7 +480,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
-        binding.webView.saveState(outState)
+        webView.saveState(outState)
     }
 
     override fun onResume() {
@@ -460,7 +489,7 @@ class MainActivity : AppCompatActivity() {
         val now = System.currentTimeMillis()
         if (lastSeen > 0 && now - lastSeen >= REFRESH_THRESHOLD_MS) {
             hasError = false
-            binding.webView.reload()
+            webView.reload()
         }
         prefs.edit().putLong(KEY_LAST_SEEN, now).apply()
     }
