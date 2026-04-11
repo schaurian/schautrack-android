@@ -11,4 +11,6 @@
     <string name="choose_image">Choose image</string>
     <string name="invalid_server">Not a valid Schautrack server</string>
     <string name="validating_server">Validating server…</string>
+    <string name="webview_unavailable">WebView Unavailable</string>
+    <string name="webview_unavailable_message">Android System WebView needs to be updated or enabled. Open Google Play Store and update \"Android System WebView\", then tap Retry.</string>
 </resources>
