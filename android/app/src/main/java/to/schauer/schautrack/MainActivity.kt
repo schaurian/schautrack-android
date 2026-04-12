@@ -6,9 +6,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.ConnectivityManager
-import android.net.NetworkCapabilities
+import android.net.Network
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
 import android.view.KeyEvent
@@ -27,6 +26,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
+import androidx.lifecycle.lifecycleScope
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
@@ -35,8 +35,10 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebViewFeature
 import to.schauer.schautrack.databinding.ActivityMainBinding
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -52,19 +54,33 @@ private const val PREFS_NAME = "schautrack_prefs"
 private const val KEY_LAST_SEEN = "last_seen_at"
 private const val KEY_SERVER_URL = "server_url"
 private const val REFRESH_THRESHOLD_MS = 15 * 60 * 1000L
+private const val RETRY_INITIAL_MS = 2000L
+private const val RETRY_MAX_MS = 30_000L
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private val prefs by lazy { getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE) }
     private var hasError = false
+    private var webViewAvailable = false
     private var serverUrl: String = DEFAULT_SERVER
+    private lateinit var webView: WebView
+    private var retryJob: Job? = null
 
     private var fileChooserCallback: ValueCallback<Array<Uri>>? = null
     private var cameraImageUri: Uri? = null
     private var pendingPermissionRequest: android.webkit.PermissionRequest? = null
     private lateinit var fileChooserLauncher: ActivityResultLauncher<Intent>
     private lateinit var permissionLauncher: ActivityResultLauncher<Array<String>>
+
+    private val networkCallback = object : ConnectivityManager.NetworkCallback() {
+        override fun onAvailable(network: Network) {
+            runOnUiThread {
+                if (retryJob?.isActive != true) return@runOnUiThread
+                if (!webViewAvailable) initWebViewWithRetry() else connectToServer()
+            }
+        }
+    }
 
     private fun getStartUrl(): String = "$serverUrl/dashboard"
 
@@ -115,13 +131,50 @@ class MainActivity : AppCompatActivity() {
             insets
         }
 
-        val webView = binding.webView
+        val initialWebView = tryCreateWebView()
+        if (initialWebView != null) {
+            webView = initialWebView
+            binding.webViewContainer.addView(webView)
+            setupWebView(webView)
+            webViewAvailable = true
+        }
 
+        binding.retryButton.setOnClickListener {
+            if (!webViewAvailable) initWebViewWithRetry() else connectToServer()
+        }
+
+        binding.changeServerButton.setOnClickListener {
+            showChangeServerDialog()
+        }
+
+        binding.errorChangeServerButton.setOnClickListener {
+            showChangeServerDialog()
+        }
+
+        val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        cm.registerDefaultNetworkCallback(networkCallback)
+
+        if (!webViewAvailable) {
+            initWebViewWithRetry()
+        } else if (savedInstanceState == null) {
+            connectToServer()
+        } else {
+            webView.restoreState(savedInstanceState)
+            showContent()
+        }
+    }
+
+    private fun updateChangeServerButtonVisibility(url: String?) {
+        binding.changeServerButton.visibility = if (isAuthPage(url)) View.VISIBLE else View.GONE
+    }
+
+    @SuppressLint("SetJavaScriptEnabled")
+    private fun setupWebView(wv: WebView) {
         CookieManager.getInstance().apply {
             setAcceptCookie(true)
-            setAcceptThirdPartyCookies(webView, true)
+            setAcceptThirdPartyCookies(wv, true)
         }
-        webView.settings.apply {
+        wv.settings.apply {
             javaScriptEnabled = true
             domStorageEnabled = true
             cacheMode = WebSettings.LOAD_DEFAULT
@@ -131,20 +184,18 @@ class MainActivity : AppCompatActivity() {
         }
 
         if (WebViewFeature.isFeatureSupported(WebViewFeature.ALGORITHMIC_DARKENING)) {
-            WebSettingsCompat.setAlgorithmicDarkeningAllowed(webView.settings, false)
+            WebSettingsCompat.setAlgorithmicDarkeningAllowed(wv.settings, false)
         }
 
-        webView.webViewClient = object : WebViewClient() {
+        wv.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                 val url = request?.url ?: return false
                 val serverHost = Uri.parse(serverUrl).host ?: return false
 
-                // Allow navigation within the configured server
                 if (url.host == serverHost) {
                     return false
                 }
 
-                // Open external links in system browser
                 startActivity(Intent(Intent.ACTION_VIEW, url))
                 return true
             }
@@ -169,10 +220,12 @@ class MainActivity : AppCompatActivity() {
                 request: WebResourceRequest?,
                 error: WebResourceError?
             ) {
-                super.onReceivedError(view, request, error)
                 if (request?.isForMainFrame == true) {
-                    verifyHealthAndShowError()
+                    hasError = true
+                    connectToServer()
+                    return
                 }
+                super.onReceivedError(view, request, error)
             }
 
             override fun onReceivedHttpError(
@@ -180,16 +233,23 @@ class MainActivity : AppCompatActivity() {
                 request: WebResourceRequest?,
                 errorResponse: android.webkit.WebResourceResponse?
             ) {
-                super.onReceivedHttpError(view, request, errorResponse)
                 if (request?.isForMainFrame == true) {
                     val statusCode = errorResponse?.statusCode ?: 0
                     if (statusCode >= 500) {
-                        verifyHealthAndShowError()
+                        hasError = true
+                        connectToServer()
+                        return
                     }
                 }
+                super.onReceivedHttpError(view, request, errorResponse)
+            }
+
+            override fun onRenderProcessGone(view: WebView?, detail: android.webkit.RenderProcessGoneDetail?): Boolean {
+                recreateWebView()
+                return true
             }
         }
-        webView.webChromeClient = object : WebChromeClient() {
+        wv.webChromeClient = object : WebChromeClient() {
             override fun onShowFileChooser(
                 webView: WebView?,
                 filePathCallback: ValueCallback<Array<Uri>>?,
@@ -226,51 +286,28 @@ class MainActivity : AppCompatActivity() {
         }
 
         binding.swipeRefresh.setOnRefreshListener {
-            if (!webView.canGoBackOrForward(0)) {
+            if (!wv.canGoBackOrForward(0)) {
                 binding.swipeRefresh.isRefreshing = false
                 return@setOnRefreshListener
             }
             hasError = false
-            webView.reload()
+            wv.reload()
         }
 
-        webView.setOnScrollChangeListener { _, _, scrollY, _, _ ->
+        wv.setOnScrollChangeListener { _, _, scrollY, _, _ ->
             binding.swipeRefresh.isEnabled = scrollY == 0
-        }
-
-        binding.retryButton.setOnClickListener {
-            hasError = false
-            showLoading()
-            webView.loadUrl(getStartUrl())
-        }
-
-        binding.changeServerButton.setOnClickListener {
-            showChangeServerDialog()
-        }
-
-        binding.errorChangeServerButton.setOnClickListener {
-            showChangeServerDialog()
-        }
-
-        if (savedInstanceState == null) {
-            showLoading()
-            if (isNetworkAvailable()) {
-                checkServerHealthAndLoad()
-            } else {
-                showError()
-            }
-        } else {
-            webView.restoreState(savedInstanceState)
-            showContent()
         }
     }
 
-    private fun updateChangeServerButtonVisibility(url: String?) {
-        binding.changeServerButton.visibility = if (isAuthPage(url)) View.VISIBLE else View.GONE
+    private fun recreateWebView() {
+        binding.webViewContainer.removeView(webView)
+        webView.destroy()
+        webViewAvailable = false
+        initWebViewWithRetry()
     }
 
     private fun showChangeServerDialog() {
-        val currentUrl = binding.webView.url
+        val currentUrl = if (webViewAvailable) webView.url else null
         val currentHost = if (currentUrl != null) {
             val uri = Uri.parse(currentUrl)
             "${uri.scheme}://${uri.host}"
@@ -314,7 +351,7 @@ class MainActivity : AppCompatActivity() {
         binding.loadingText.text = getString(R.string.validating_server)
         showLoading()
 
-        CoroutineScope(Dispatchers.IO).launch {
+        lifecycleScope.launch(Dispatchers.IO) {
             val isValid = try {
                 val url = URL("$newUrl/api/health")
                 val connection = url.openConnection() as HttpURLConnection
@@ -339,7 +376,11 @@ class MainActivity : AppCompatActivity() {
                     serverUrl = newUrl
                     prefs.edit().putString(KEY_SERVER_URL, serverUrl).apply()
                     hasError = false
-                    binding.webView.loadUrl(getStartUrl())
+                    if (webViewAvailable) {
+                        webView.loadUrl(getStartUrl())
+                    } else {
+                        initWebViewWithRetry()
+                    }
                 } else {
                     showContent()
                     MaterialAlertDialogBuilder(this@MainActivity, R.style.Theme_Schautrack_Dialog)
@@ -352,33 +393,56 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun showLoading() {
-        binding.loadingView.visibility = View.VISIBLE
-        binding.errorView.visibility = View.GONE
-        binding.swipeRefresh.visibility = View.VISIBLE
+    // -- Retry logic ----------------------------------------------------------
+
+    private fun tryCreateWebView(): WebView? {
+        return try {
+            WebView(this).apply {
+                layoutParams = android.view.ViewGroup.LayoutParams(
+                    android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                    android.view.ViewGroup.LayoutParams.MATCH_PARENT
+                )
+            }
+        } catch (e: Exception) {
+            null
+        }
     }
 
-    private fun showContent() {
-        binding.loadingView.visibility = View.GONE
-        binding.errorView.visibility = View.GONE
-        binding.swipeRefresh.visibility = View.VISIBLE
-    }
-
-    private fun showError() {
-        binding.loadingView.visibility = View.GONE
-        binding.errorView.visibility = View.VISIBLE
-        binding.swipeRefresh.visibility = View.GONE
-    }
-
-    private fun verifyHealthAndShowError() {
-        CoroutineScope(Dispatchers.IO).launch {
-            val isHealthy = checkHealth()
-
-            withContext(Dispatchers.Main) {
-                if (!isHealthy) {
-                    hasError = true
-                    showError()
+    private fun initWebViewWithRetry() {
+        retryJob?.cancel()
+        showLoading()
+        retryJob = lifecycleScope.launch {
+            var delayMs = RETRY_INITIAL_MS
+            while (isActive) {
+                val wv = tryCreateWebView()
+                if (wv != null) {
+                    webView = wv
+                    binding.webViewContainer.addView(webView)
+                    setupWebView(webView)
+                    webViewAvailable = true
+                    connectToServer()
+                    return@launch
                 }
+                delay(delayMs)
+                delayMs = (delayMs * 2).coerceAtMost(RETRY_MAX_MS)
+            }
+        }
+    }
+
+    private fun connectToServer() {
+        retryJob?.cancel()
+        showLoading()
+        retryJob = lifecycleScope.launch {
+            var delayMs = RETRY_INITIAL_MS
+            while (isActive) {
+                val healthy = withContext(Dispatchers.IO) { checkHealth() }
+                if (healthy) {
+                    hasError = false
+                    webView.loadUrl(getStartUrl())
+                    return@launch
+                }
+                delay(delayMs)
+                delayMs = (delayMs * 2).coerceAtMost(RETRY_MAX_MS)
             }
         }
     }
@@ -403,47 +467,57 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun isNetworkAvailable(): Boolean {
-        val connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        val network = connectivityManager.activeNetwork ?: return false
-        val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
-        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+    // -- View state ------------------------------------------------------------
+
+    private fun showLoading() {
+        binding.loadingView.visibility = View.VISIBLE
+        binding.errorView.visibility = View.GONE
+        binding.swipeRefresh.visibility = View.VISIBLE
     }
 
-    private fun checkServerHealthAndLoad() {
-        CoroutineScope(Dispatchers.IO).launch {
-            val isHealthy = try {
-                val url = URL("$serverUrl/api/health")
-                val connection = url.openConnection() as HttpURLConnection
-                connection.connectTimeout = 10000
-                connection.readTimeout = 10000
-                connection.requestMethod = "GET"
+    private fun showContent() {
+        binding.loadingView.visibility = View.GONE
+        binding.errorView.visibility = View.GONE
+        binding.swipeRefresh.visibility = View.VISIBLE
+    }
 
-                if (connection.responseCode == 200) {
-                    val response = connection.inputStream.bufferedReader().readText()
-                    val json = JSONObject(response)
-                    json.optString("app") == "schautrack"
-                } else {
-                    false
-                }
-            } catch (e: Exception) {
-                false
-            }
+    // -- Lifecycle -------------------------------------------------------------
 
-            withContext(Dispatchers.Main) {
-                if (isHealthy) {
-                    binding.webView.loadUrl(getStartUrl())
-                } else {
-                    hasError = true
-                    showError()
-                }
-            }
+    override fun onResume() {
+        super.onResume()
+        if (retryJob?.isActive == true) return
+        if (!webViewAvailable) {
+            initWebViewWithRetry()
+            return
         }
+        if (hasError) {
+            connectToServer()
+            return
+        }
+        val lastSeen = prefs.getLong(KEY_LAST_SEEN, 0L)
+        val now = System.currentTimeMillis()
+        if (lastSeen > 0 && now - lastSeen >= REFRESH_THRESHOLD_MS) {
+            hasError = false
+            webView.reload()
+        }
+        prefs.edit().putLong(KEY_LAST_SEEN, now).apply()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        retryJob?.cancel()
+        prefs.edit().putLong(KEY_LAST_SEEN, System.currentTimeMillis()).apply()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        cm.unregisterNetworkCallback(networkCallback)
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        if (keyCode == KeyEvent.KEYCODE_BACK && binding.webView.canGoBack()) {
-            binding.webView.goBack()
+        if (keyCode == KeyEvent.KEYCODE_BACK && webViewAvailable && webView.canGoBack()) {
+            webView.goBack()
             return true
         }
         return super.onKeyDown(keyCode, event)
@@ -451,24 +525,12 @@ class MainActivity : AppCompatActivity() {
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
-        binding.webView.saveState(outState)
-    }
-
-    override fun onResume() {
-        super.onResume()
-        val lastSeen = prefs.getLong(KEY_LAST_SEEN, 0L)
-        val now = System.currentTimeMillis()
-        if (lastSeen > 0 && now - lastSeen >= REFRESH_THRESHOLD_MS) {
-            hasError = false
-            binding.webView.reload()
+        if (webViewAvailable) {
+            webView.saveState(outState)
         }
-        prefs.edit().putLong(KEY_LAST_SEEN, now).apply()
     }
 
-    override fun onPause() {
-        super.onPause()
-        prefs.edit().putLong(KEY_LAST_SEEN, System.currentTimeMillis()).apply()
-    }
+    // -- Camera / file chooser -------------------------------------------------
 
     private fun hasCameraPermission(): Boolean {
         return ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED

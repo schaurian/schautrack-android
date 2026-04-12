@@ -8,8 +8,8 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent">
 
-        <WebView
-            android:id="@+id/webView"
+        <FrameLayout
+            android:id="@+id/webViewContainer"
             android:layout_width="match_parent"
             android:layout_height="match_parent" />
 
@@ -63,6 +63,7 @@
         android:visibility="gone">
 
         <TextView
+            android:id="@+id/errorTitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/no_connection"
@@ -70,9 +71,13 @@
             android:textAppearance="?attr/textAppearanceHeadlineMedium" />
 
         <TextView
+            android:id="@+id/errorMessage"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
+            android:layout_marginStart="32dp"
+            android:layout_marginEnd="32dp"
+            android:gravity="center"
             android:text="@string/check_internet"
             android:textColor="@color/muted"
             android:textAppearance="?attr/textAppearanceBodyMedium" />
