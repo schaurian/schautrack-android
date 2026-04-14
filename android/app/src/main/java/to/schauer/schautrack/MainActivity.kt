@@ -12,6 +12,7 @@ import android.os.Bundle
 import android.provider.MediaStore
 import android.view.KeyEvent
 import android.view.View
+import android.view.WindowManager
 import android.webkit.CookieManager
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
@@ -33,6 +34,7 @@ import com.google.android.material.textfield.TextInputLayout
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.webkit.WebSettingsCompat
+import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import to.schauer.schautrack.databinding.ActivityMainBinding
 import kotlinx.coroutines.Dispatchers
@@ -62,6 +64,14 @@ class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private val prefs by lazy { getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE) }
     private var hasError = false
+
+    override fun getSystemService(name: String): Any? {
+        if (SchautrackApp.webViewInitInProgress && name == Context.WINDOW_SERVICE) {
+            return SchautrackApp.createSilentWindowManager(super.getSystemService(name) as WindowManager)
+        }
+        return super.getSystemService(name)
+    }
+
     private var webViewAvailable = false
     private var serverUrl: String = DEFAULT_SERVER
     private lateinit var webView: WebView
@@ -401,6 +411,21 @@ class MainActivity : AppCompatActivity() {
     // -- Retry logic ----------------------------------------------------------
 
     private fun tryCreateWebView(): WebView? {
+        // Quick pre-check: skip creation entirely if the WebView package is missing.
+        try {
+            val pkg = WebViewCompat.getCurrentWebViewPackage(this) ?: return null
+            packageManager.getPackageInfo(pkg.packageName, 0)
+        } catch (e: Exception) {
+            return null
+        }
+
+        // Suppress the Android system "Something went wrong" dialog during
+        // WebView creation. WebViewFactory shows an AlertDialog via the
+        // Activity/Application context when the provider is unavailable
+        // (e.g. mid-update). By returning a no-op WindowManager from
+        // getSystemService(), the dialog's show() silently does nothing
+        // while the exception still propagates to our catch block.
+        SchautrackApp.webViewInitInProgress = true
         return try {
             WebView(this).apply {
                 layoutParams = android.view.ViewGroup.LayoutParams(
@@ -410,6 +435,8 @@ class MainActivity : AppCompatActivity() {
             }
         } catch (e: Exception) {
             null
+        } finally {
+            SchautrackApp.webViewInitInProgress = false
         }
     }
 
