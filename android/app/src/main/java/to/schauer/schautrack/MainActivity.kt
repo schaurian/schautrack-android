@@ -143,10 +143,7 @@ class MainActivity : AppCompatActivity() {
 
         val initialWebView = tryCreateWebView()
         if (initialWebView != null) {
-            webView = initialWebView
-            binding.webViewContainer.addView(webView)
-            setupWebView(webView)
-            webViewAvailable = true
+            trySetupWebView(initialWebView)
         }
 
         binding.retryButton.setOnClickListener {
@@ -314,9 +311,24 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun trySetupWebView(wv: WebView): Boolean {
+        return try {
+            webView = wv
+            binding.webViewContainer.addView(wv)
+            setupWebView(wv)
+            webViewAvailable = true
+            true
+        } catch (e: Throwable) {
+            try { binding.webViewContainer.removeView(wv) } catch (_: Throwable) {}
+            try { wv.destroy() } catch (_: Throwable) {}
+            webViewAvailable = false
+            false
+        }
+    }
+
     private fun recreateWebView() {
-        binding.webViewContainer.removeView(webView)
-        webView.destroy()
+        try { binding.webViewContainer.removeView(webView) } catch (_: Throwable) {}
+        try { webView.destroy() } catch (_: Throwable) {}
         webViewAvailable = false
         initWebViewWithRetry()
     }
@@ -415,15 +427,13 @@ class MainActivity : AppCompatActivity() {
         try {
             val pkg = WebViewCompat.getCurrentWebViewPackage(this) ?: return null
             packageManager.getPackageInfo(pkg.packageName, 0)
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             return null
         }
 
-        // Suppress the Android system "Something went wrong" dialog during
-        // WebView creation. WebViewFactory shows an AlertDialog via the
-        // Activity/Application context when the provider is unavailable
-        // (e.g. mid-update). By returning a no-op WindowManager from
-        // getSystemService(), the dialog's show() silently does nothing
+        // Suppress any in-process dialog that Google's WebView code might show
+        // when the provider is unavailable (e.g. mid-update). We return a no-op
+        // WindowManager from getSystemService() so any dialog show() is a no-op,
         // while the exception still propagates to our catch block.
         SchautrackApp.webViewInitInProgress = true
         return try {
@@ -433,7 +443,7 @@ class MainActivity : AppCompatActivity() {
                     android.view.ViewGroup.LayoutParams.MATCH_PARENT
                 )
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             null
         } finally {
             SchautrackApp.webViewInitInProgress = false
@@ -447,11 +457,7 @@ class MainActivity : AppCompatActivity() {
             var delayMs = RETRY_INITIAL_MS
             while (isActive) {
                 val wv = tryCreateWebView()
-                if (wv != null) {
-                    webView = wv
-                    binding.webViewContainer.addView(webView)
-                    setupWebView(webView)
-                    webViewAvailable = true
+                if (wv != null && trySetupWebView(wv)) {
                     connectToServer()
                     return@launch
                 }
