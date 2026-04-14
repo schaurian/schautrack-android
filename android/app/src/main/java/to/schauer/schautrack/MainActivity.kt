@@ -244,6 +244,11 @@ class MainActivity : AppCompatActivity() {
                 super.onReceivedHttpError(view, request, errorResponse)
             }
 
+            override fun doUpdateVisitedHistory(view: WebView?, url: String?, isReload: Boolean) {
+                super.doUpdateVisitedHistory(view, url, isReload)
+                updateChangeServerButtonVisibility(url)
+            }
+
             override fun onRenderProcessGone(view: WebView?, detail: android.webkit.RenderProcessGoneDetail?): Boolean {
                 recreateWebView()
                 return true
