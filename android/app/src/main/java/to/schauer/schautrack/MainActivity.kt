@@ -166,8 +166,12 @@ class MainActivity : AppCompatActivity() {
         } else if (savedInstanceState == null) {
             connectToServer()
         } else {
-            webView.restoreState(savedInstanceState)
-            showContent()
+            try {
+                webView.restoreState(savedInstanceState)
+                showContent()
+            } catch (e: Throwable) {
+                recreateWebView()
+            }
         }
     }
 
@@ -298,12 +302,17 @@ class MainActivity : AppCompatActivity() {
         }
 
         binding.swipeRefresh.setOnRefreshListener {
-            if (!wv.canGoBackOrForward(0)) {
+            try {
+                if (!wv.canGoBackOrForward(0)) {
+                    binding.swipeRefresh.isRefreshing = false
+                    return@setOnRefreshListener
+                }
+                hasError = false
+                wv.reload()
+            } catch (e: Throwable) {
                 binding.swipeRefresh.isRefreshing = false
-                return@setOnRefreshListener
+                recreateWebView()
             }
-            hasError = false
-            wv.reload()
         }
 
         wv.setOnScrollChangeListener { _, _, scrollY, _, _ ->
@@ -334,7 +343,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showChangeServerDialog() {
-        val currentUrl = if (webViewAvailable) webView.url else null
+        val currentUrl = if (webViewAvailable) try { webView.url } catch (_: Throwable) { null } else null
         val currentHost = if (currentUrl != null) {
             val uri = Uri.parse(currentUrl)
             "${uri.scheme}://${uri.host}"
@@ -404,7 +413,11 @@ class MainActivity : AppCompatActivity() {
                     prefs.edit().putString(KEY_SERVER_URL, serverUrl).apply()
                     hasError = false
                     if (webViewAvailable) {
-                        webView.loadUrl(getStartUrl())
+                        try {
+                            webView.loadUrl(getStartUrl())
+                        } catch (e: Throwable) {
+                            recreateWebView()
+                        }
                     } else {
                         initWebViewWithRetry()
                     }
@@ -476,7 +489,11 @@ class MainActivity : AppCompatActivity() {
                 val healthy = withContext(Dispatchers.IO) { checkHealth() }
                 if (healthy) {
                     hasError = false
-                    webView.loadUrl(getStartUrl())
+                    try {
+                        webView.loadUrl(getStartUrl())
+                    } catch (e: Throwable) {
+                        recreateWebView()
+                    }
                     return@launch
                 }
                 delay(delayMs)
@@ -536,7 +553,12 @@ class MainActivity : AppCompatActivity() {
         val now = System.currentTimeMillis()
         if (lastSeen > 0 && now - lastSeen >= REFRESH_THRESHOLD_MS) {
             hasError = false
-            webView.reload()
+            try {
+                webView.reload()
+            } catch (e: Throwable) {
+                recreateWebView()
+                return
+            }
         }
         prefs.edit().putLong(KEY_LAST_SEEN, now).apply()
     }
@@ -554,9 +576,16 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        if (keyCode == KeyEvent.KEYCODE_BACK && webViewAvailable && webView.canGoBack()) {
-            webView.goBack()
-            return true
+        if (keyCode == KeyEvent.KEYCODE_BACK && webViewAvailable) {
+            try {
+                if (webView.canGoBack()) {
+                    webView.goBack()
+                    return true
+                }
+            } catch (e: Throwable) {
+                recreateWebView()
+                return true
+            }
         }
         return super.onKeyDown(keyCode, event)
     }
@@ -564,7 +593,7 @@ class MainActivity : AppCompatActivity() {
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         if (webViewAvailable) {
-            webView.saveState(outState)
+            try { webView.saveState(outState) } catch (_: Throwable) {}
         }
     }
 
