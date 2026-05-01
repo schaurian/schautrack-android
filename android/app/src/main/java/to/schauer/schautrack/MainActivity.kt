@@ -198,6 +198,13 @@ class MainActivity : AppCompatActivity() {
             WebSettingsCompat.setAlgorithmicDarkeningAllowed(wv.settings, false)
         }
 
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_AUTHENTICATION)) {
+            WebSettingsCompat.setWebAuthenticationSupport(
+                wv.settings,
+                WebSettingsCompat.WEB_AUTHENTICATION_SUPPORT_FOR_APP
+            )
+        }
+
         wv.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                 val url = request?.url ?: return false
