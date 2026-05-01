@@ -2,12 +2,15 @@ package to.schauer.schautrack
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.app.ActivityManager
+import android.app.ApplicationExitInfo
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
 import android.view.KeyEvent
@@ -55,9 +58,11 @@ private const val DEFAULT_SERVER = BuildConfig.DEFAULT_SERVER
 private const val PREFS_NAME = "schautrack_prefs"
 private const val KEY_LAST_SEEN = "last_seen_at"
 private const val KEY_SERVER_URL = "server_url"
+private const val KEY_LAST_URL = "last_url"
 private const val REFRESH_THRESHOLD_MS = 15 * 60 * 1000L
 private const val RETRY_INITIAL_MS = 2000L
 private const val RETRY_MAX_MS = 30_000L
+private const val WEBVIEW_KILL_RESTORE_WINDOW_MS = 5 * 60 * 1000L
 
 class MainActivity : AppCompatActivity() {
 
@@ -92,7 +97,36 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun getStartUrl(): String = "$serverUrl/dashboard"
+    private var pendingRestoreUrl: String? = null
+
+    private fun getStartUrl(): String {
+        pendingRestoreUrl?.let {
+            pendingRestoreUrl = null
+            return it
+        }
+        return "$serverUrl/dashboard"
+    }
+
+    private fun consumeRestoreUrlIfKilledByWebView(): String? {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return null
+        val am = getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager ?: return null
+        val lastExit = try {
+            am.getHistoricalProcessExitReasons(packageName, 0, 1).firstOrNull()
+        } catch (_: Throwable) {
+            null
+        } ?: return null
+        if (System.currentTimeMillis() - lastExit.timestamp > WEBVIEW_KILL_RESTORE_WINDOW_MS) return null
+        val desc = lastExit.description ?: ""
+        val killedByWebView = lastExit.reason == ApplicationExitInfo.REASON_DEPENDENCY_DIED ||
+            desc.contains("installPackageLI") ||
+            desc.contains("com.google.android.webview") ||
+            desc.contains("com.android.chrome")
+        if (!killedByWebView) return null
+        val last = prefs.getString(KEY_LAST_URL, null) ?: return null
+        val serverHost = Uri.parse(serverUrl).host ?: return null
+        val lastHost = Uri.parse(last).host ?: return null
+        return if (lastHost == serverHost) last else null
+    }
 
     private fun isAuthPage(url: String?): Boolean {
         if (url == null) return false
@@ -134,6 +168,10 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         serverUrl = prefs.getString(KEY_SERVER_URL, DEFAULT_SERVER) ?: DEFAULT_SERVER
+
+        if (savedInstanceState == null) {
+            pendingRestoreUrl = consumeRestoreUrlIfKilledByWebView()
+        }
 
         ViewCompat.setOnApplyWindowInsetsListener(binding.root) { view, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
@@ -265,6 +303,9 @@ class MainActivity : AppCompatActivity() {
             override fun doUpdateVisitedHistory(view: WebView?, url: String?, isReload: Boolean) {
                 super.doUpdateVisitedHistory(view, url, isReload)
                 updateChangeServerButtonVisibility(url)
+                if (url != null && !isAuthPage(url)) {
+                    prefs.edit().putString(KEY_LAST_URL, url).apply()
+                }
             }
 
             override fun onRenderProcessGone(view: WebView?, detail: android.webkit.RenderProcessGoneDetail?): Boolean {
