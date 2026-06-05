@@ -81,6 +81,7 @@ class MainActivity : AppCompatActivity() {
     private var serverUrl: String = DEFAULT_SERVER
     private lateinit var webView: WebView
     private var retryJob: Job? = null
+    private var fastRestoreInProgress = false
 
     private var fileChooserCallback: ValueCallback<Array<Uri>>? = null
     private var cameraImageUri: Uri? = null
@@ -258,6 +259,7 @@ class MainActivity : AppCompatActivity() {
 
             override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
                 super.onPageStarted(view, url, favicon)
+                if (fastRestoreInProgress) return
                 if (!hasError) {
                     showLoading()
                 }
@@ -268,6 +270,7 @@ class MainActivity : AppCompatActivity() {
                 if (!hasError) {
                     showContent()
                 }
+                fastRestoreInProgress = false
                 updateChangeServerButtonVisibility(url)
             }
 
@@ -530,6 +533,26 @@ class MainActivity : AppCompatActivity() {
 
     private fun connectToServer() {
         retryJob?.cancel()
+
+        val restoreUrl = pendingRestoreUrl
+        if (restoreUrl != null) {
+            // The OS killed us mid-session because Play Store updated
+            // com.google.android.webview. The server was reachable seconds ago,
+            // so probe + spinner are pure latency on the recovery path.
+            pendingRestoreUrl = null
+            hasError = false
+            fastRestoreInProgress = true
+            showContent()
+            try {
+                webView.loadUrl(restoreUrl)
+            } catch (e: Throwable) {
+                fastRestoreInProgress = false
+                recreateWebView()
+            }
+            return
+        }
+
+        fastRestoreInProgress = false
         showLoading()
         retryJob = lifecycleScope.launch {
             var delayMs = RETRY_INITIAL_MS
