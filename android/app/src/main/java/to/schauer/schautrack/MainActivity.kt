@@ -82,6 +82,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var webView: WebView
     private var retryJob: Job? = null
     private var fastRestoreInProgress = false
+    private var webViewPackageVersion: String? = null
 
     private var fileChooserCallback: ValueCallback<Array<Uri>>? = null
     private var cameraImageUri: Uri? = null
@@ -375,8 +376,9 @@ class MainActivity : AppCompatActivity() {
         return try {
             webView = wv
             binding.webViewContainer.addView(wv)
-            setupWebView(wv)
+            withWebViewDialogSuppressed { setupWebView(wv) }
             webViewAvailable = true
+            webViewPackageVersion = currentWebViewVersion()
             true
         } catch (e: Throwable) {
             try { binding.webViewContainer.removeView(wv) } catch (_: Throwable) {}
@@ -465,7 +467,7 @@ class MainActivity : AppCompatActivity() {
                     hasError = false
                     if (webViewAvailable) {
                         try {
-                            webView.loadUrl(getStartUrl())
+                            withWebViewDialogSuppressed { webView.loadUrl(getStartUrl()) }
                         } catch (e: Throwable) {
                             recreateWebView()
                         }
@@ -499,18 +501,49 @@ class MainActivity : AppCompatActivity() {
         // when the provider is unavailable (e.g. mid-update). We return a no-op
         // WindowManager from getSystemService() so any dialog show() is a no-op,
         // while the exception still propagates to our catch block.
-        SchautrackApp.webViewInitInProgress = true
         return try {
-            WebView(this).apply {
-                layoutParams = android.view.ViewGroup.LayoutParams(
-                    android.view.ViewGroup.LayoutParams.MATCH_PARENT,
-                    android.view.ViewGroup.LayoutParams.MATCH_PARENT
-                )
+            withWebViewDialogSuppressed {
+                WebView(this).apply {
+                    layoutParams = android.view.ViewGroup.LayoutParams(
+                        android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                        android.view.ViewGroup.LayoutParams.MATCH_PARENT
+                    )
+                }
             }
         } catch (e: Throwable) {
             null
+        }
+    }
+
+    /**
+     * Runs [block] with the silent-WindowManager guard active, so any in-process
+     * dialog the system WebView/Chrome code tries to show (e.g. the
+     * "Check that Google Play is enabled" split-check dialog when the WebView
+     * package is mid-update) is swallowed instead of flashing on screen.
+     * Re-entrant: restores the previous flag value on exit.
+     */
+    private fun <T> withWebViewDialogSuppressed(block: () -> T): T {
+        val previous = SchautrackApp.webViewInitInProgress
+        SchautrackApp.webViewInitInProgress = true
+        return try {
+            block()
         } finally {
-            SchautrackApp.webViewInitInProgress = false
+            SchautrackApp.webViewInitInProgress = previous
+        }
+    }
+
+    /** Identity (package + version) of the currently-selected WebView provider, or null if unknown. */
+    private fun currentWebViewVersion(): String? {
+        return try {
+            val pkg = WebViewCompat.getCurrentWebViewPackage(this) ?: return null
+            val code = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                pkg.longVersionCode.toString()
+            } else {
+                @Suppress("DEPRECATION") pkg.versionCode.toString()
+            }
+            "${pkg.packageName}:${pkg.versionName}:$code"
+        } catch (_: Throwable) {
+            null
         }
     }
 
@@ -544,7 +577,7 @@ class MainActivity : AppCompatActivity() {
             fastRestoreInProgress = true
             showContent()
             try {
-                webView.loadUrl(restoreUrl)
+                withWebViewDialogSuppressed { webView.loadUrl(restoreUrl) }
             } catch (e: Throwable) {
                 fastRestoreInProgress = false
                 recreateWebView()
@@ -561,7 +594,7 @@ class MainActivity : AppCompatActivity() {
                 if (healthy) {
                     hasError = false
                     try {
-                        webView.loadUrl(getStartUrl())
+                        withWebViewDialogSuppressed { webView.loadUrl(getStartUrl()) }
                     } catch (e: Throwable) {
                         recreateWebView()
                     }
@@ -616,6 +649,20 @@ class MainActivity : AppCompatActivity() {
             initWebViewWithRetry()
             return
         }
+        // If the system WebView/Chrome package was updated while we were
+        // backgrounded, the implementation loaded into this process is now
+        // stale. Touching the existing WebView would trip the provider's
+        // "Check that Google Play is enabled" split check — a visible dialog,
+        // usually followed by a process kill. Recreate through the suppression
+        // window instead: any such dialog is routed into the silent path, and
+        // if the OS then kills us the restore-URL logic recovers the page.
+        val webViewVersion = currentWebViewVersion()
+        if (webViewPackageVersion != null && webViewVersion != null &&
+            webViewVersion != webViewPackageVersion
+        ) {
+            recreateWebView()
+            return
+        }
         if (hasError) {
             connectToServer()
             return
@@ -625,7 +672,7 @@ class MainActivity : AppCompatActivity() {
         if (lastSeen > 0 && now - lastSeen >= REFRESH_THRESHOLD_MS) {
             hasError = false
             try {
-                webView.reload()
+                withWebViewDialogSuppressed { webView.reload() }
             } catch (e: Throwable) {
                 recreateWebView()
                 return
