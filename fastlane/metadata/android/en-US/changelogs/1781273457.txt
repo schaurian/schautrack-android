@@ -1,0 +1,6 @@
+- Quantity selector: log multiples of a food in one tap
+- Quick-add chips for saved foods on the dashboard
+- Manage saved foods inline, with Undo on delete
+- Custom date range now persists after a reload
+- New bug report / feature request link in Settings
+- Mobile layout polish and a database stability fix

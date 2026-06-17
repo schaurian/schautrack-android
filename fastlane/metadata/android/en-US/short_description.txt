@@ -1,0 +1,1 @@
+Self-hostable, open-source calorie & weight tracker with AI food estimation
