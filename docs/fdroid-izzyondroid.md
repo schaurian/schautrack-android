@@ -29,44 +29,72 @@ No build changes are needed.
 
 ## How to request inclusion (one-time, manual)
 
-IzzyOnDroid inclusion requests are filed on their GitLab. This step needs a
-GitLab account, so it must be done by a maintainer.
+> **Note:** IzzyOnDroid moved app inclusion requests off GitLab. They are now
+> filed on **Codeberg**, using a Forgejo issue form. A Codeberg account is
+> required, so this must be done by a maintainer.
 
-1. Go to <https://gitlab.com/IzzyOnDroid/repo/-/issues/new>.
-2. Pick the **"Request packaging"** issue template.
-3. Fill in the details (a ready-to-paste version is below).
-4. Submit. The IzzyOnDroid maintainer reviews, the bot scans the APK for
-   trackers/proprietary blobs, and the app usually appears within a few days at:
+1. Go to <https://codeberg.org/IzzyOnDroid/repodata/issues/new?template=.forgejo%2Fissue_template%2Fapp-inclusion-request.yaml>
+   (or open a new issue in `IzzyOnDroid/repodata` and pick the
+   **"App Inclusion Request"** template).
+2. Fill in the form (a ready-to-paste version is below). Keep the app name in
+   the title: `[AppRequest] Schautrack`.
+3. Submit. A maintainer reviews, the bot runs an on-device test and an APK scan
+   for trackers/proprietary blobs, and the app usually appears within a few days at:
    <https://apt.izzysoft.de/fdroid/index/apk/to.schauer.schautrack>
+
+The inclusion policy is at <https://izzyondroid.org/docs/general/AppInclusionPolicy/>.
 
 ### Ready-to-paste request
 
 ```
-App name: Schautrack
-Package ID: to.schauer.schautrack
-Source code: https://github.com/schaurian/schautrack-android
-License: AGPL-3.0
-Upstream/website: https://schautrack.com
-Issue tracker: https://github.com/schaurian/schautrack-android/issues
+Title: [AppRequest] Schautrack
 
-Release channel: GitHub Releases
-APK asset pattern: schautrack-<version>.apk (prod flavor, release build, signed)
-Latest release: https://github.com/schaurian/schautrack-android/releases/latest
+Guidelines:
+[x] I am the developer of the app
+[x] The app complies with the App Inclusion Policy
+[x] The app is not already listed in the repo or issue tracker
+[x] The Fastlane folder is available in the app's repo
 
-Notes:
-- Native WebView wrapper for the open-source Schautrack web app; adds camera
-  access for food scanning and barcode lookups.
-- Fully FOSS, no Google Play Services, no Firebase, no proprietary SDKs
-  (deps: AndroidX + Google Material only).
-- Fastlane metadata (title, descriptions, screenshots, changelog) is in the
-  repo at fastlane/metadata/android/en-US/.
+Link to the source code: https://github.com/schaurian/schautrack-android
+Link to app in another app store: https://play.google.com/store/apps/details?id=to.schauer.schautrack
+License used: AGPL-3.0
+Categories: Sports & Health, Food
+
+Summary:
+Native Android app for Schautrack, a self-hostable, open-source, AI-powered
+calorie and weight tracker for you and your friends.
+
+Description:
+Schautrack is the native Android app for Schautrack, a self-hostable,
+open-source calorie tracker. Track what you eat, set daily goals, and watch
+your weight, with optional AI nutrition estimation from a single food photo.
+It wraps the Schautrack web app in a native shell and adds camera access for
+food scanning and barcode lookups. By default it connects to schautrack.com,
+but you can point it at your own server from the login screen.
+
+Build instructions:
+  git clone https://github.com/schaurian/schautrack-android
+  cd schautrack-android/android
+  ./gradlew assembleProdRelease
+  # Output: app/build/outputs/apk/prod/release/schautrack-<version>.apk
+A signed prod APK is also attached to every GitHub Release.
+
+AI tools:
+- Assistance Level: Moderate - used for specific tasks or modules
+- Tool(s): Claude
+- What it helped with: boilerplate, debugging, documentation, and the
+  F-Droid/Fastlane metadata
+- [x] Reviewed and edited all AI-generated outputs
+- [x] Manually tested and verified all changes
+
+Further Notices:
 - versionCode is a Unix timestamp, so it increases monotonically.
-
-Anti-features (please flag as appropriate):
-- NonFreeNet: by default the app connects to the hosted instance at
-  schautrack.com, and AI food estimation uses external providers
-  (OpenAI/Claude) unless a local model is configured. The app is
+- Anti-feature NonFreeNet applies: by default the app connects to the hosted
+  instance at schautrack.com, and AI food estimation uses external providers
+  (OpenAI/Claude) unless a local model is configured. The app is fully
   self-hostable, so users can avoid all non-free network services.
+- No Google Play Services, no Firebase, no proprietary SDKs
+  (dependencies: AndroidX + Google Material only).
 ```
 
 ## After acceptance
