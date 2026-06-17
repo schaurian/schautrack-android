@@ -6,3 +6,4 @@ android/**/.cxx
 android/captures
 .vscode
 
+.claude/worktrees
