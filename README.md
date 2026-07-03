@@ -18,7 +18,7 @@
 
 This is a native Android wrapper for the Schautrack web application. It provides a seamless mobile experience with native features like camera access for food scanning.
 
-By default, the app connects to [schautrack.com](https://schautrack.com), but you can change the server URL on the login screen to use your own self-hosted instance.
+By default, the app connects to [schautrack.com](https://schautrack.com), but you can change the server URL on the login screen to use your own self-hosted instance. Note that your self-hosted instance must be served over HTTPS — the app rejects plain `http://` URLs.
 
 ## Screenshots
 
