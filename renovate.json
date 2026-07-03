@@ -13,5 +13,15 @@
       "matchPackagePrefixes": ["androidx."],
       "groupName": "androidx"
     }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Keep the Renovate runner image in renovate.yml up to date",
+      "fileMatch": ["^\\.github/workflows/renovate\\.yml$"],
+      "matchStrings": ["image:\\s*renovate/renovate:(?<currentValue>\\S+)"],
+      "depNameTemplate": "renovate/renovate",
+      "datasourceTemplate": "docker"
+    }
   ]
 }
