@@ -10,7 +10,7 @@
 
 - Always verify that SDK versions, dependencies, and API targets are current before making changes
 - Search online for the latest stable versions of dependencies before updating
-- Google Play requires targeting the latest API level (currently API 35 for 2025)
+- Google Play requires new apps and updates to target a recent API level (Play raises this each year). This app currently uses `targetSdk = 36` and `compileSdk = 37` — check the current Play requirement before changing.
 
 ## Key Files
 
@@ -20,6 +20,7 @@
 
 ## CI/CD
 
+- Pull requests are validated by `.github/workflows/ci.yml` (assemble + lint on `android/**` changes); keep lint error-clean so this stays green
 - GitHub Actions workflows handle building and publishing to Google Play
 - Required GitHub secrets for Google Play publishing:
   - `PLAY_SERVICE_ACCOUNT_JSON_B64`

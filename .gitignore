@@ -7,3 +7,6 @@ android/captures
 .vscode
 
 .claude/worktrees
+
+# Stray personal dotfiles clone must never be committed here
+dotfiles/
