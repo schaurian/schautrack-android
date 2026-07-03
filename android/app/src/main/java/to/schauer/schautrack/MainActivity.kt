@@ -251,7 +251,9 @@ class MainActivity : AppCompatActivity() {
     private fun setupWebView(wv: WebView) {
         CookieManager.getInstance().apply {
             setAcceptCookie(true)
-            setAcceptThirdPartyCookies(wv, true)
+            // Single-first-party app: the session cookie is first-party, so
+            // third-party cookies are unnecessary attack/tracking surface.
+            setAcceptThirdPartyCookies(wv, false)
         }
         wv.settings.apply {
             javaScriptEnabled = true
@@ -486,23 +488,7 @@ class MainActivity : AppCompatActivity() {
         showLoading()
 
         lifecycleScope.launch(Dispatchers.IO) {
-            val isValid = try {
-                val url = URL("$newUrl/api/health")
-                val connection = url.openConnection() as HttpURLConnection
-                connection.connectTimeout = 10000
-                connection.readTimeout = 10000
-                connection.requestMethod = "GET"
-
-                if (connection.responseCode == 200) {
-                    val response = connection.inputStream.bufferedReader().readText()
-                    val json = JSONObject(response)
-                    json.optString("app") == "schautrack"
-                } else {
-                    false
-                }
-            } catch (e: Exception) {
-                false
-            }
+            val isValid = probeHealth(newUrl, 10000)
 
             withContext(Dispatchers.Main) {
                 binding.loadingText.text = getString(R.string.loading)
@@ -635,7 +621,7 @@ class MainActivity : AppCompatActivity() {
         retryJob = lifecycleScope.launch {
             var delayMs = RETRY_INITIAL_MS
             while (isActive) {
-                val healthy = withContext(Dispatchers.IO) { checkHealth() }
+                val healthy = withContext(Dispatchers.IO) { probeHealth(serverUrl, 5000) }
                 if (healthy) {
                     hasError = false
                     try {
@@ -651,23 +637,29 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun checkHealth(): Boolean {
+    /**
+     * Blocking GET of [base]/api/health; true iff it responds 200 with the
+     * schautrack marker. Always releases the connection, even on error — this
+     * runs inside an unbounded retry loop, so a leak here accumulates.
+     */
+    private fun probeHealth(base: String, timeoutMs: Int): Boolean {
+        var connection: HttpURLConnection? = null
         return try {
-            val url = URL("$serverUrl/api/health")
-            val connection = url.openConnection() as HttpURLConnection
-            connection.connectTimeout = 5000
-            connection.readTimeout = 5000
-            connection.requestMethod = "GET"
-
+            connection = (URL("$base/api/health").openConnection() as HttpURLConnection).apply {
+                connectTimeout = timeoutMs
+                readTimeout = timeoutMs
+                requestMethod = "GET"
+            }
             if (connection.responseCode == 200) {
-                val response = connection.inputStream.bufferedReader().readText()
-                val json = JSONObject(response)
-                json.optString("app") == "schautrack"
+                val response = connection.inputStream.bufferedReader().use { it.readText() }
+                JSONObject(response).optString("app") == "schautrack"
             } else {
                 false
             }
         } catch (e: Exception) {
             false
+        } finally {
+            connection?.disconnect()
         }
     }
 
@@ -729,6 +721,9 @@ class MainActivity : AppCompatActivity() {
     override fun onStop() {
         super.onStop()
         retryJob?.cancel()
+        // Persist cookies to disk now: a WebView-update process kill right after
+        // login would otherwise drop the just-set session cookie.
+        CookieManager.getInstance().flush()
         prefs.edit().putLong(KEY_LAST_SEEN, System.currentTimeMillis()).apply()
     }
 
