@@ -10,6 +10,8 @@
     <string name="connect">Connect</string>
     <string name="choose_image">Choose image</string>
     <string name="invalid_server">Not a valid Schautrack server</string>
+    <string name="https_required">HTTPS Required</string>
+    <string name="https_required_message">This app cannot connect to servers over plain HTTP (http://). Self-hosted servers must be reachable via HTTPS — for example behind a reverse proxy with a TLS certificate.</string>
     <string name="validating_server">Validating server…</string>
     <string name="webview_unavailable">WebView Unavailable</string>
     <string name="webview_unavailable_message">Android System WebView needs to be updated or enabled. Open Google Play Store and update \"Android System WebView\", then tap Retry.</string>

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- Debug builds allow cleartext (http://) so self-hosted LAN instances can be tested. -->
+    <base-config cleartextTrafficPermitted="true" />
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">schautrack.com</domain>
+        <domain includeSubdomains="true">staging.schautrack.com</domain>
+    </domain-config>
+</network-security-config>

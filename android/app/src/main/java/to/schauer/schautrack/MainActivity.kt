@@ -14,6 +14,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
+import android.security.NetworkSecurityPolicy
 import android.view.View
 import android.view.WindowManager
 import android.webkit.CookieManager
@@ -477,7 +478,18 @@ class MainActivity : AppCompatActivity() {
                         newUrl = "https://$newUrl"
                     }
                     newUrl = newUrl.trimEnd('/')
-                    validateAndConnectToServer(newUrl)
+                    val host = Uri.parse(newUrl).host
+                    val cleartextBlocked = newUrl.startsWith("http://") &&
+                        (host == null || !NetworkSecurityPolicy.getInstance().isCleartextTrafficPermitted(host))
+                    if (cleartextBlocked) {
+                        MaterialAlertDialogBuilder(this, R.style.Theme_Schautrack_Dialog)
+                            .setTitle(R.string.https_required)
+                            .setMessage(R.string.https_required_message)
+                            .setPositiveButton(android.R.string.ok, null)
+                            .show()
+                    } else {
+                        validateAndConnectToServer(newUrl)
+                    }
                 }
             }
             .setNegativeButton(R.string.cancel, null)
