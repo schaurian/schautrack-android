@@ -4,6 +4,7 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.app.ActivityManager
 import android.app.ApplicationExitInfo
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -13,7 +14,6 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
-import android.view.KeyEvent
 import android.view.View
 import android.view.WindowManager
 import android.webkit.CookieManager
@@ -24,6 +24,7 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
@@ -100,6 +101,31 @@ class MainActivity : AppCompatActivity() {
     }
 
     private var pendingRestoreUrl: String? = null
+
+    // Back handling via the dispatcher (not onKeyDown), so it keeps working on
+    // Android 16+ where predictive back stops delivering KEYCODE_BACK.
+    private val onBackPressedCallback = object : OnBackPressedCallback(false) {
+        override fun handleOnBackPressed() {
+            try {
+                if (webView.canGoBack()) {
+                    webView.goBack()
+                    return
+                }
+            } catch (e: Throwable) {
+                recreateWebView()
+                return
+            }
+            // Nothing to go back to — disable and re-dispatch so the system
+            // performs its default (exit) behavior without re-entering here.
+            isEnabled = false
+            this@MainActivity.onBackPressedDispatcher.onBackPressed()
+        }
+    }
+
+    private fun updateBackCallbackState() {
+        onBackPressedCallback.isEnabled = webViewAvailable &&
+            try { webView.canGoBack() } catch (_: Throwable) { false }
+    }
 
     private fun getStartUrl(): String {
         pendingRestoreUrl?.let {
@@ -198,6 +224,8 @@ class MainActivity : AppCompatActivity() {
             showChangeServerDialog()
         }
 
+        onBackPressedDispatcher.addCallback(this, onBackPressedCallback)
+
         val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         cm.registerDefaultNetworkCallback(networkCallback)
 
@@ -223,7 +251,9 @@ class MainActivity : AppCompatActivity() {
     private fun setupWebView(wv: WebView) {
         CookieManager.getInstance().apply {
             setAcceptCookie(true)
-            setAcceptThirdPartyCookies(wv, true)
+            // Single-first-party app: the session cookie is first-party, so
+            // third-party cookies are unnecessary attack/tracking surface.
+            setAcceptThirdPartyCookies(wv, false)
         }
         wv.settings.apply {
             javaScriptEnabled = true
@@ -254,7 +284,13 @@ class MainActivity : AppCompatActivity() {
                     return false
                 }
 
-                startActivity(Intent(Intent.ACTION_VIEW, url))
+                try {
+                    startActivity(Intent(Intent.ACTION_VIEW, url))
+                } catch (_: ActivityNotFoundException) {
+                    // No installed app can handle this URI (e.g. a mailto: on a
+                    // device with no mail client, or market:// on a de-Googled
+                    // phone). Swallow it instead of crashing.
+                }
                 return true
             }
 
@@ -273,6 +309,7 @@ class MainActivity : AppCompatActivity() {
                 }
                 fastRestoreInProgress = false
                 updateChangeServerButtonVisibility(url)
+                updateBackCallbackState()
             }
 
             override fun onReceivedError(
@@ -307,6 +344,7 @@ class MainActivity : AppCompatActivity() {
             override fun doUpdateVisitedHistory(view: WebView?, url: String?, isReload: Boolean) {
                 super.doUpdateVisitedHistory(view, url, isReload)
                 updateChangeServerButtonVisibility(url)
+                updateBackCallbackState()
                 if (url != null && !isAuthPage(url)) {
                     prefs.edit().putString(KEY_LAST_URL, url).apply()
                 }
@@ -337,8 +375,17 @@ class MainActivity : AppCompatActivity() {
             override fun onPermissionRequest(request: android.webkit.PermissionRequest?) {
                 request?.let { req ->
                     runOnUiThread {
-                        val requestedResources = req.resources
-                        if (requestedResources.contains(android.webkit.PermissionRequest.RESOURCE_VIDEO_CAPTURE)) {
+                        // Only honor permission requests coming from the configured
+                        // server's own origin — never from third-party iframes or
+                        // an unexpected host.
+                        val serverHost = Uri.parse(serverUrl).host
+                        if (serverHost == null || req.origin?.host != serverHost) {
+                            req.deny()
+                            return@runOnUiThread
+                        }
+                        // The app only ever needs the camera (food scanning). Grant
+                        // video capture; deny anything else (audio, protected media, …).
+                        if (req.resources.contains(android.webkit.PermissionRequest.RESOURCE_VIDEO_CAPTURE)) {
                             if (hasCameraPermission()) {
                                 req.grant(arrayOf(android.webkit.PermissionRequest.RESOURCE_VIDEO_CAPTURE))
                             } else {
@@ -346,7 +393,7 @@ class MainActivity : AppCompatActivity() {
                                 permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA))
                             }
                         } else {
-                            req.grant(requestedResources)
+                            req.deny()
                         }
                     }
                 }
@@ -410,7 +457,8 @@ class MainActivity : AppCompatActivity() {
                 android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
                 android.widget.FrameLayout.LayoutParams.WRAP_CONTENT
             ).apply {
-                setMargins(48, 32, 48, 0)
+                val density = resources.displayMetrics.density
+                setMargins((24 * density).toInt(), (16 * density).toInt(), (24 * density).toInt(), 0)
             }
         }
 
@@ -441,23 +489,7 @@ class MainActivity : AppCompatActivity() {
         showLoading()
 
         lifecycleScope.launch(Dispatchers.IO) {
-            val isValid = try {
-                val url = URL("$newUrl/api/health")
-                val connection = url.openConnection() as HttpURLConnection
-                connection.connectTimeout = 10000
-                connection.readTimeout = 10000
-                connection.requestMethod = "GET"
-
-                if (connection.responseCode == 200) {
-                    val response = connection.inputStream.bufferedReader().readText()
-                    val json = JSONObject(response)
-                    json.optString("app") == "schautrack"
-                } else {
-                    false
-                }
-            } catch (e: Exception) {
-                false
-            }
+            val isValid = probeHealth(newUrl, 10000)
 
             withContext(Dispatchers.Main) {
                 binding.loadingText.text = getString(R.string.loading)
@@ -590,7 +622,7 @@ class MainActivity : AppCompatActivity() {
         retryJob = lifecycleScope.launch {
             var delayMs = RETRY_INITIAL_MS
             while (isActive) {
-                val healthy = withContext(Dispatchers.IO) { checkHealth() }
+                val healthy = withContext(Dispatchers.IO) { probeHealth(serverUrl, 5000) }
                 if (healthy) {
                     hasError = false
                     try {
@@ -606,23 +638,29 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun checkHealth(): Boolean {
+    /**
+     * Blocking GET of [base]/api/health; true iff it responds 200 with the
+     * schautrack marker. Always releases the connection, even on error — this
+     * runs inside an unbounded retry loop, so a leak here accumulates.
+     */
+    private fun probeHealth(base: String, timeoutMs: Int): Boolean {
+        var connection: HttpURLConnection? = null
         return try {
-            val url = URL("$serverUrl/api/health")
-            val connection = url.openConnection() as HttpURLConnection
-            connection.connectTimeout = 5000
-            connection.readTimeout = 5000
-            connection.requestMethod = "GET"
-
+            connection = (URL("$base/api/health").openConnection() as HttpURLConnection).apply {
+                connectTimeout = timeoutMs
+                readTimeout = timeoutMs
+                requestMethod = "GET"
+            }
             if (connection.responseCode == 200) {
-                val response = connection.inputStream.bufferedReader().readText()
-                val json = JSONObject(response)
-                json.optString("app") == "schautrack"
+                val response = connection.inputStream.bufferedReader().use { it.readText() }
+                JSONObject(response).optString("app") == "schautrack"
             } else {
                 false
             }
         } catch (e: Exception) {
             false
+        } finally {
+            connection?.disconnect()
         }
     }
 
@@ -684,6 +722,9 @@ class MainActivity : AppCompatActivity() {
     override fun onStop() {
         super.onStop()
         retryJob?.cancel()
+        // Persist cookies to disk now: a WebView-update process kill right after
+        // login would otherwise drop the just-set session cookie.
+        CookieManager.getInstance().flush()
         prefs.edit().putLong(KEY_LAST_SEEN, System.currentTimeMillis()).apply()
     }
 
@@ -691,21 +732,6 @@ class MainActivity : AppCompatActivity() {
         super.onDestroy()
         val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         cm.unregisterNetworkCallback(networkCallback)
-    }
-
-    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        if (keyCode == KeyEvent.KEYCODE_BACK && webViewAvailable) {
-            try {
-                if (webView.canGoBack()) {
-                    webView.goBack()
-                    return true
-                }
-            } catch (e: Throwable) {
-                recreateWebView()
-                return true
-            }
-        }
-        return super.onKeyDown(keyCode, event)
     }
 
     override fun onSaveInstanceState(outState: Bundle) {

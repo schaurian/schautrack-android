@@ -3,17 +3,13 @@ plugins {
     id("com.github.triplet.play")
 }
 
-// Semantic versioning driven by CI tags or manual overrides
-def resolvedVersionName = {
-    def tagVersion = System.getenv("CI_COMMIT_TAG")?.replaceFirst(/^v/, "")
-    return System.getenv("VERSION_NAME") ?: tagVersion ?: "1.0.0"
-}.call()
+// Version name/code are supplied by CI (VERSION_NAME / VERSION_CODE); fall back
+// to sane defaults for local builds.
+def resolvedVersionName = System.getenv("VERSION_NAME") ?: "1.0.0"
 
-// Ensure versionCode monotonically increases; defaults to pipeline IID if provided
 def resolvedVersionCode = {
-    def code = System.getenv("VERSION_CODE") ?: System.getenv("CI_PIPELINE_IID")
     try {
-        return code?.toInteger() ?: 1
+        return System.getenv("VERSION_CODE")?.toInteger() ?: 1
     } catch (ignored) {
         return 1
     }
@@ -58,7 +54,7 @@ android {
                 storePassword = System.getenv("ANDROID_UPLOAD_KEYSTORE_PASS") ?: ""
                 keyAlias = System.getenv("ANDROID_UPLOAD_KEY_ALIAS") ?: ""
                 keyPassword = System.getenv("ANDROID_UPLOAD_KEY_PASS") ?: ""
-            } else if (System.getenv("CI") || System.getenv("GITLAB_CI")) {
+            } else if (System.getenv("CI")) {
                 // In CI without keystore - will fail at signing step with clear error
                 storeFile = null
             } else {
@@ -103,7 +99,7 @@ androidComponents {
         tasks.configureEach { task ->
             if (task.name == "assemble${variant.name.capitalize()}") {
                 task.doLast {
-                    def apkDir = file("${buildDir}/outputs/apk/${variant.flavorName}/${variant.buildType}")
+                    def apkDir = file("${layout.buildDirectory.get().asFile}/outputs/apk/${variant.flavorName}/${variant.buildType}")
                     if (apkDir.exists()) {
                         apkDir.listFiles()?.findAll { it.name.endsWith(".apk") }?.each { apkFile ->
                             def baseName = "schautrack"
