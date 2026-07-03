@@ -3,7 +3,6 @@ package to.schauer.schautrack
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.ActivityManager
-import android.app.ApplicationExitInfo
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
@@ -64,7 +63,6 @@ private const val KEY_LAST_URL = "last_url"
 private const val REFRESH_THRESHOLD_MS = 15 * 60 * 1000L
 private const val RETRY_INITIAL_MS = 2000L
 private const val RETRY_MAX_MS = 30_000L
-private const val WEBVIEW_KILL_RESTORE_WINDOW_MS = 5 * 60 * 1000L
 
 class MainActivity : AppCompatActivity() {
 
@@ -144,25 +142,16 @@ class MainActivity : AppCompatActivity() {
         } catch (_: Throwable) {
             null
         } ?: return null
-        if (System.currentTimeMillis() - lastExit.timestamp > WEBVIEW_KILL_RESTORE_WINDOW_MS) return null
-        val desc = lastExit.description ?: ""
-        val killedByWebView = lastExit.reason == ApplicationExitInfo.REASON_DEPENDENCY_DIED ||
-            desc.contains("installPackageLI") ||
-            desc.contains("com.google.android.webview") ||
-            desc.contains("com.android.chrome")
-        if (!killedByWebView) return null
-        val last = prefs.getString(KEY_LAST_URL, null) ?: return null
-        val serverHost = Uri.parse(serverUrl).host ?: return null
-        val lastHost = Uri.parse(last).host ?: return null
-        return if (lastHost == serverHost) last else null
+        return UrlPolicy.restoreUrlAfterWebViewKill(
+            reason = lastExit.reason,
+            description = lastExit.description,
+            exitAgeMs = System.currentTimeMillis() - lastExit.timestamp,
+            lastUrl = prefs.getString(KEY_LAST_URL, null),
+            serverUrl = serverUrl
+        )
     }
 
-    private fun isAuthPage(url: String?): Boolean {
-        if (url == null) return false
-        val uri = Uri.parse(url)
-        val path = uri.path?.trimEnd('/') ?: return false
-        return path == "/login" || path == "/register"
-    }
+    private fun isAuthPage(url: String?): Boolean = UrlPolicy.isAuthPage(url)
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -203,8 +192,8 @@ class MainActivity : AppCompatActivity() {
         }
 
         ViewCompat.setOnApplyWindowInsetsListener(binding.root) { view, insets ->
-            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            view.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
+            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.ime())
+            view.setPadding(bars.left, bars.top, bars.right, bars.bottom)
             insets
         }
 
@@ -472,12 +461,8 @@ class MainActivity : AppCompatActivity() {
             .setTitle(R.string.change_server)
             .setView(textInputLayout)
             .setPositiveButton(R.string.connect) { _, _ ->
-                var newUrl = input.text.toString().trim()
-                if (newUrl.isNotEmpty()) {
-                    if (!newUrl.startsWith("http://") && !newUrl.startsWith("https://")) {
-                        newUrl = "https://$newUrl"
-                    }
-                    newUrl = newUrl.trimEnd('/')
+                val newUrl = UrlPolicy.normalizeServerUrlInput(input.text.toString())
+                if (newUrl != null) {
                     val host = Uri.parse(newUrl).host
                     val cleartextBlocked = newUrl.startsWith("http://") &&
                         (host == null || !NetworkSecurityPolicy.getInstance().isCleartextTrafficPermitted(host))
