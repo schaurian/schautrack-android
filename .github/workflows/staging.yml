@@ -38,7 +38,12 @@ jobs:
 
       - name: Generate version code
         id: version
-        run: echo "code=$(date +%s)" >> $GITHUB_OUTPUT
+        # versionCode: raw `date +%s` would cross Play's 2,100,000,000 hard cap
+        # in 2036 (#49). Rebased scheme: 1.8e9 base + 10-second ticks since
+        # 2025-07-01 UTC (epoch 1751328000). Still strictly monotonic, grows
+        # ~3.15M/year, reaches the cap around year 2120. Keep in sync with
+        # release.yml.
+        run: echo "code=$(( 1800000000 + ( $(date +%s) - 1751328000 ) / 10 ))" >> $GITHUB_OUTPUT
 
       - name: Create release notes
         run: |
