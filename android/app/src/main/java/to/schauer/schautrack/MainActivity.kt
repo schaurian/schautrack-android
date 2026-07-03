@@ -457,7 +457,8 @@ class MainActivity : AppCompatActivity() {
                 android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
                 android.widget.FrameLayout.LayoutParams.WRAP_CONTENT
             ).apply {
-                setMargins(48, 32, 48, 0)
+                val density = resources.displayMetrics.density
+                setMargins((24 * density).toInt(), (16 * density).toInt(), (24 * density).toInt(), 0)
             }
         }
 
