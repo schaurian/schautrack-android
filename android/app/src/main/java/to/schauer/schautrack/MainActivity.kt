@@ -4,6 +4,7 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.app.ActivityManager
 import android.app.ApplicationExitInfo
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -13,7 +14,6 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
-import android.view.KeyEvent
 import android.view.View
 import android.view.WindowManager
 import android.webkit.CookieManager
@@ -24,6 +24,7 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
@@ -100,6 +101,31 @@ class MainActivity : AppCompatActivity() {
     }
 
     private var pendingRestoreUrl: String? = null
+
+    // Back handling via the dispatcher (not onKeyDown), so it keeps working on
+    // Android 16+ where predictive back stops delivering KEYCODE_BACK.
+    private val onBackPressedCallback = object : OnBackPressedCallback(false) {
+        override fun handleOnBackPressed() {
+            try {
+                if (webView.canGoBack()) {
+                    webView.goBack()
+                    return
+                }
+            } catch (e: Throwable) {
+                recreateWebView()
+                return
+            }
+            // Nothing to go back to — disable and re-dispatch so the system
+            // performs its default (exit) behavior without re-entering here.
+            isEnabled = false
+            this@MainActivity.onBackPressedDispatcher.onBackPressed()
+        }
+    }
+
+    private fun updateBackCallbackState() {
+        onBackPressedCallback.isEnabled = webViewAvailable &&
+            try { webView.canGoBack() } catch (_: Throwable) { false }
+    }
 
     private fun getStartUrl(): String {
         pendingRestoreUrl?.let {
@@ -198,6 +224,8 @@ class MainActivity : AppCompatActivity() {
             showChangeServerDialog()
         }
 
+        onBackPressedDispatcher.addCallback(this, onBackPressedCallback)
+
         val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         cm.registerDefaultNetworkCallback(networkCallback)
 
@@ -254,7 +282,13 @@ class MainActivity : AppCompatActivity() {
                     return false
                 }
 
-                startActivity(Intent(Intent.ACTION_VIEW, url))
+                try {
+                    startActivity(Intent(Intent.ACTION_VIEW, url))
+                } catch (_: ActivityNotFoundException) {
+                    // No installed app can handle this URI (e.g. a mailto: on a
+                    // device with no mail client, or market:// on a de-Googled
+                    // phone). Swallow it instead of crashing.
+                }
                 return true
             }
 
@@ -273,6 +307,7 @@ class MainActivity : AppCompatActivity() {
                 }
                 fastRestoreInProgress = false
                 updateChangeServerButtonVisibility(url)
+                updateBackCallbackState()
             }
 
             override fun onReceivedError(
@@ -307,6 +342,7 @@ class MainActivity : AppCompatActivity() {
             override fun doUpdateVisitedHistory(view: WebView?, url: String?, isReload: Boolean) {
                 super.doUpdateVisitedHistory(view, url, isReload)
                 updateChangeServerButtonVisibility(url)
+                updateBackCallbackState()
                 if (url != null && !isAuthPage(url)) {
                     prefs.edit().putString(KEY_LAST_URL, url).apply()
                 }
@@ -337,8 +373,17 @@ class MainActivity : AppCompatActivity() {
             override fun onPermissionRequest(request: android.webkit.PermissionRequest?) {
                 request?.let { req ->
                     runOnUiThread {
-                        val requestedResources = req.resources
-                        if (requestedResources.contains(android.webkit.PermissionRequest.RESOURCE_VIDEO_CAPTURE)) {
+                        // Only honor permission requests coming from the configured
+                        // server's own origin — never from third-party iframes or
+                        // an unexpected host.
+                        val serverHost = Uri.parse(serverUrl).host
+                        if (serverHost == null || req.origin?.host != serverHost) {
+                            req.deny()
+                            return@runOnUiThread
+                        }
+                        // The app only ever needs the camera (food scanning). Grant
+                        // video capture; deny anything else (audio, protected media, …).
+                        if (req.resources.contains(android.webkit.PermissionRequest.RESOURCE_VIDEO_CAPTURE)) {
                             if (hasCameraPermission()) {
                                 req.grant(arrayOf(android.webkit.PermissionRequest.RESOURCE_VIDEO_CAPTURE))
                             } else {
@@ -346,7 +391,7 @@ class MainActivity : AppCompatActivity() {
                                 permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA))
                             }
                         } else {
-                            req.grant(requestedResources)
+                            req.deny()
                         }
                     }
                 }
@@ -691,21 +736,6 @@ class MainActivity : AppCompatActivity() {
         super.onDestroy()
         val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         cm.unregisterNetworkCallback(networkCallback)
-    }
-
-    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        if (keyCode == KeyEvent.KEYCODE_BACK && webViewAvailable) {
-            try {
-                if (webView.canGoBack()) {
-                    webView.goBack()
-                    return true
-                }
-            } catch (e: Throwable) {
-                recreateWebView()
-                return true
-            }
-        }
-        return super.onKeyDown(keyCode, event)
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
