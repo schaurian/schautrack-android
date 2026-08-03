@@ -192,8 +192,16 @@ class MainActivity : AppCompatActivity() {
         }
 
         ViewCompat.setOnApplyWindowInsetsListener(binding.root) { view, insets ->
-            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.ime())
-            view.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            val ime = insets.getInsets(WindowInsetsCompat.Type.ime())
+            // The bottom system-bar inset is deliberately not consumed here.
+            // The page is served with viewport-fit=cover and its tab bar pads
+            // itself with env(safe-area-inset-bottom), so it draws its own
+            // background down to the screen edge. Padding the WebView as well
+            // ended the viewport above the gesture bar and left a band of bare
+            // Activity background between the tab bar and the gesture pill.
+            // The IME inset still applies, or the keyboard covers the inputs.
+            view.setPadding(bars.left, bars.top, bars.right, ime.bottom)
             insets
         }
 
