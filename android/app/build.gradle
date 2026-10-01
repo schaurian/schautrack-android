@@ -94,6 +94,20 @@ android {
         unitTests {
             // Robolectric needs the merged Android resources on the JVM classpath.
             includeAndroidResources = true
+
+            // Robolectric 4.17 boots an Android runtime whose
+            // ApplicationSharedMemory.create() pokes at raw FileDescriptor
+            // internals, and Robolectric's FileDescriptorInterceptor reaches
+            // them through jdk.internal.access.SharedSecrets — which java.base
+            // does not export to the unnamed module. Without this export every
+            // test dies in setUpApplicationState with "Failed to interact with
+            // raw FileDescriptor internals; perhaps JRE has changed?", so it is
+            // a prerequisite of the 4.17 bump rather than a tuning knob.
+            // Only ci.yml runs these tests (JDK 21); staging.yml and release.yml
+            // publish bundles and never execute them.
+            all {
+                jvmArgs '--add-exports=java.base/jdk.internal.access=ALL-UNNAMED'
+            }
         }
     }
 
