@@ -1,3 +1,6 @@
+> [!WARNING]
+> **Archived and unmaintained.** This repository is archived and no longer maintained. The hosted instance at schautrack.com was shut down on 2026-11-22. No further releases will be published.
+
 <p align="center">
   <img src="assets/app-icon.png" alt="Schautrack" width="120" height="120">
 </p>
